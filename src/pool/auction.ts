@@ -1,10 +1,12 @@
 import { FixedMath } from '../index.js';
 import { AuctionData, PoolEventType, PoolV1Event, PoolV2Event } from './index.js';
+
 export enum AuctionType {
   Liquidation = 0,
   BadDebt = 1,
   Interest = 2,
 }
+
 export interface Auctions {
   /**
    * Represents the filled auctions
