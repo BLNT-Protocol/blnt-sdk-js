@@ -73,10 +73,11 @@ export function createEventResponse(
       ? vecToScVal(val)
       : nativeToScVal(val.value, { type: val.type }).toXDR('base64'),
     id: '1',
+    transactionIndex: 1,
+    operationIndex: 0,
     type: 'contract',
     ledger: 123,
     ledgerClosedAt: '2025-04-08T12:34:56Z',
-    pagingToken: 'test-token',
     inSuccessfulContractCall: true,
     txHash: 'txhash123',
   };

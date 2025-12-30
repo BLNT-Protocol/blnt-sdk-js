@@ -296,10 +296,11 @@ describe('Backstop Event Parsing', () => {
           type: ['address', null],
         }),
         id: '1',
+        transactionIndex: 1,
+        operationIndex: 0,
         type: 'contract',
         ledger: 123,
         ledgerClosedAt: '2025-04-08T12:34:56Z',
-        pagingToken: 'test-token',
         inSuccessfulContractCall: true,
         txHash: 'txhash123',
       };
