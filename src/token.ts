@@ -111,6 +111,7 @@ export class TokenMetadata {
                 }
                 return;
               case 'decimal':
+              case 'decimals':
                 decimal = scValToNative(meta_entry.val());
                 return;
             }
