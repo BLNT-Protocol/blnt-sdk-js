@@ -17,6 +17,8 @@ const REFLECTOR_ORACLE_ADDRESSES = [
   'CAFJZQWSED6YAWZU3GWRTOCNPPCGBN32L7QV43XX5LZLFTK6JLN34DLN',
 ];
 
+// This is the current, rounded up value the host charges for "Read 1 ledger entry from disk"
+// It's unlikely these are read from disk in the first place, but this will get refunded if not
 const REFLECTOR_ENTRY_RESOURCE_FEE = 2_000n;
 
 export interface PriceData {
@@ -210,7 +212,7 @@ export function addReflectorEntries(txXdr: string): string {
   }
 
   const resourceFee = sorobanData.resourceFee().toBigInt();
-  const baseFee = ((BigInt(tx.fee) - resourceFee) / BigInt(tx.operations.length)).toString();
+  const baseFee = (BigInt(tx.fee) - resourceFee).toString();
   const newResourceFee = resourceFee + BigInt(newReadEntries.length) * REFLECTOR_ENTRY_RESOURCE_FEE;
   sorobanData
     .resources()
