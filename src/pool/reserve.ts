@@ -106,7 +106,7 @@ export abstract class Reserve {
 
   /**
    * Get the liability factor as a floating point decimal percentage.
-   * (e.g 1.23 == 95%). This inverts the stored value on chain to make
+   * (e.g 1.23 == 123%). This inverts the stored value on chain to make
    * computing the effective liability easier.
    *
    * The effective liability of a position is:
@@ -133,37 +133,27 @@ export abstract class Reserve {
 
   /**
    * Get the utilization of the Reserve as a fixed point number
+   * with 7 decimals (e.g. 5000000 == 50% utilization).
    */
   public getUtilization(): bigint {
-    const totalSupply = this.totalSupply();
-    if (totalSupply === BigInt(0)) {
+    const liabilities = this.totalLiabilities();
+    const supply = this.totalSupply();
+
+    if (liabilities === BigInt(0)) {
       return BigInt(0);
-    } else {
-      return FixedMath.divCeil(
-        this.totalLiabilities(),
-        totalSupply,
-        FixedMath.toFixed(1, this.config.decimals)
-      );
+    } else if (liabilities >= supply) {
+      return FixedMath.SCALAR_7;
     }
+
+    return FixedMath.divCeil(liabilities, supply, FixedMath.SCALAR_7);
   }
 
   /**
-   * Get the utilization of the Reserve as a floating point number
+   * Get the utilization of the Reserve as a floating point decimal percentage
+   * (e.g. 0.5 == 50% utilization).
    */
   public getUtilizationFloat(): number {
-    const totalSupply = this.totalSupply();
-    if (totalSupply === BigInt(0)) {
-      return 0;
-    } else {
-      return FixedMath.toFloat(
-        FixedMath.divCeil(
-          this.totalLiabilities(),
-          totalSupply,
-          FixedMath.toFixed(1, this.config.decimals)
-        ),
-        7
-      );
-    }
+    return FixedMath.toFloat(this.getUtilization(), 7);
   }
 
   /**
@@ -350,12 +340,6 @@ export abstract class Reserve {
    */
   public setRates(backstopTakeRate: bigint): bigint {
     const curUtil = this.getUtilization();
-    if (curUtil === BigInt(0)) {
-      this.borrowApr = FixedMath.toFloat(BigInt(this.config.r_base), 7);
-      this.supplyApr = 0;
-      return 0n;
-    }
-
     const IR_MOD_SCALAR = FixedMath.toFixed(1, this.irmodDecimals);
 
     let curIr: bigint;
@@ -365,7 +349,10 @@ export abstract class Reserve {
 
     // calculate current IR
     if (curUtil <= targetUtil) {
-      const utilScalar = FixedMath.divCeil(curUtil, targetUtil, FixedMath.SCALAR_7);
+      const utilScalar =
+        targetUtil === BigInt(0)
+          ? BigInt(0)
+          : FixedMath.divCeil(curUtil, targetUtil, FixedMath.SCALAR_7);
       const baseRate =
         FixedMath.mulCeil(utilScalar, BigInt(this.config.r_one), FixedMath.SCALAR_7) +
         BigInt(this.config.r_base);
@@ -784,7 +771,7 @@ export class ReserveV2 extends Reserve {
       throw new Error('Unable to load reserve: missing ledger entries.');
     }
 
-    let reserveConfig: ReserveConfig | undefined;
+    let reserveConfig: ReserveConfigV2 | undefined;
     let reserveData: ReserveData | undefined;
     let emissionBorrowData: EmissionDataV2 | undefined;
     let emissionSupplyData: EmissionDataV2 | undefined;
@@ -793,7 +780,7 @@ export class ReserveV2 extends Reserve {
       const key = decodeEntryKey(ledgerEntry.contractData().key());
       switch (key) {
         case 'ResConfig':
-          reserveConfig = ReserveConfig.fromLedgerEntryData(ledgerEntry);
+          reserveConfig = ReserveConfigV2.fromLedgerEntryData(ledgerEntry);
           break;
         case 'ResData':
           reserveData = ReserveData.fromLedgerEntryData(ledgerEntry);
@@ -864,9 +851,7 @@ export class ReserveV2 extends Reserve {
         ...[
           ReserveConfigV2.ledgerKey(poolId, reserveId),
           ReserveData.ledgerKey(poolId, reserveId),
-          ReserveEmissionConfig.ledgerKey(poolId, bTokenIndex),
           ReserveEmissionData.ledgerKey(poolId, bTokenIndex),
-          ReserveEmissionConfig.ledgerKey(poolId, dTokenIndex),
           ReserveEmissionData.ledgerKey(poolId, dTokenIndex),
         ]
       );

@@ -2,6 +2,8 @@ import { xdr, nativeToScVal } from '@stellar/stellar-sdk';
 import { AuctionData } from '../../src';
 import { Api } from '@stellar/stellar-sdk/rpc';
 
+type NativeToScValType = NonNullable<Parameters<typeof nativeToScVal>[1]>['type'];
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function vecToScVal(val: { value: any; type: any }): string {
   const scvals: xdr.ScVal[] = [];
@@ -58,7 +60,7 @@ export function auctionDataToScVal(auction: AuctionData): string {
 export function createEventResponse(
   contractId: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  topics: { value: any; type: string }[],
+  topics: { value: any; type: NativeToScValType }[],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   val: { value: any; type: any }
 ): Api.RawEventResponse {

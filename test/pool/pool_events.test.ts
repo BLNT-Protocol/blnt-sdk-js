@@ -36,6 +36,8 @@ import {
   PoolUpdatePoolV2Event,
 } from '../../src';
 import { Keypair, nativeToScVal, xdr } from '@stellar/stellar-sdk';
+
+type NativeToScValType = NonNullable<Parameters<typeof nativeToScVal>[1]>['type'];
 import { vecToScVal, auctionDataToScVal, createEventResponse } from '../utils/event_helpers';
 
 describe('Pool Event Parsing', () => {
@@ -699,8 +701,8 @@ describe('Pool Event Parsing', () => {
           r_three: ['symbol', 'u32'],
           reactivity: ['symbol', 'u32'],
           supply_cap: ['symbol', 'i128'],
-          enabled: ['symbol', 'bool'],
-        },
+          enabled: ['symbol', null],
+        } as NativeToScValType,
       });
       const value = vecToScVal({
         value: [asset, reserveConfig],

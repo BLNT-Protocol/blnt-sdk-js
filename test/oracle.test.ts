@@ -9,6 +9,8 @@ const REFLECTOR_ORACLE_ADDRESSES = [
   'CAFJZQWSED6YAWZU3GWRTOCNPPCGBN32L7QV43XX5LZLFTK6JLN34DLN',
 ];
 
+const REFLECTOR_ENTRY_RESOURCE_FEE = 2_000n;
+
 describe('addReflectorEntries', () => {
   let baseTransaction: Transaction;
   // the pool contract used in the base transaction
@@ -41,23 +43,47 @@ describe('addReflectorEntries', () => {
     );
   }
 
-  function appendEntriesToTx(baseTx: Transaction, readOnly: xdr.LedgerKey[], readWrite: xdr.LedgerKey[], extraReadBytes: number = 0): Transaction {
-    const sorobanData = baseTx.toEnvelope().v1().tx().ext().sorobanData();
+  function getSorobanData(tx: Transaction): xdr.SorobanTransactionData {
+    return tx.toEnvelope().v1().tx().ext().sorobanData();
+  }
+
+  function getBaseFee(tx: Transaction): string {
+    const sorobanData = getSorobanData(tx);
+    const inclusionFee = BigInt(tx.fee) - sorobanData.resourceFee().toBigInt();
+    return (inclusionFee / BigInt(tx.operations.length)).toString();
+  }
+
+  function appendEntriesToTx(
+    baseTx: Transaction,
+    readOnly: xdr.LedgerKey[],
+    readWrite: xdr.LedgerKey[],
+    extraReadBytes: number = 0,
+    extraResourceFee: bigint = 0n
+  ): Transaction {
+    const tx = new Transaction(
+      xdr.TransactionEnvelope.fromXDR(baseTx.toXDR(), 'base64'),
+      Networks.PUBLIC
+    );
+    const sorobanData = getSorobanData(tx);
     const footprint = sorobanData.resources().footprint();
 
     // Append new read-only and read-write entries
     footprint.readOnly([...footprint.readOnly(), ...readOnly]);
     footprint.readWrite([...footprint.readWrite(), ...readWrite]);
 
-    if (extraReadBytes > 0 ) {
+    if (extraReadBytes > 0) {
       const curReadBytes = sorobanData.resources().diskReadBytes();
       sorobanData.resources().diskReadBytes(curReadBytes + extraReadBytes);
     }
 
-    // Clone and build the transaction
-    return TransactionBuilder.cloneFrom(baseTx, {
+    if (extraResourceFee > 0n) {
+      const resourceFee = sorobanData.resourceFee().toBigInt() + extraResourceFee;
+      sorobanData.resourceFee(xdr.Int64.fromString(resourceFee.toString()));
+    }
+
+    return TransactionBuilder.cloneFrom(tx, {
+      fee: getBaseFee(baseTx),
       sorobanData: sorobanData,
-      fee: baseTx.fee,
     }).build();
   }
 
@@ -86,16 +112,36 @@ describe('addReflectorEntries', () => {
       createReflectorEntry(0, nextRoundTimestamp, REFLECTOR_ORACLE_ADDRESSES[0]),
       createReflectorEntry(3, nextRoundTimestamp, REFLECTOR_ORACLE_ADDRESSES[0]),
     ];
-    const expectedTx = appendEntriesToTx(baseTransaction, expectedExtraROEntries, [], 100 * 2);
+    const expectedTx = appendEntriesToTx(
+      baseTransaction,
+      expectedExtraROEntries,
+      [],
+      100 * 2,
+      REFLECTOR_ENTRY_RESOURCE_FEE * 2n
+    );
+    const resultTransaction = new Transaction(resultTx, Networks.PUBLIC);
 
     expect(resultTx).toEqual(expectedTx.toXDR());
+    expect(getSorobanData(resultTransaction).resourceFee().toBigInt()).toEqual(
+      getSorobanData(textTx).resourceFee().toBigInt() + REFLECTOR_ENTRY_RESOURCE_FEE * 2n
+    );
+    expect(BigInt(resultTransaction.fee)).toEqual(
+      BigInt(textTx.fee) + REFLECTOR_ENTRY_RESOURCE_FEE * 2n
+    );
   });
 
   it('should respect the 100 entry limit', () => {
     const mockTimestamp = Date.now();
     const currRoundTimestamp = BigInt(Math.floor(mockTimestamp / 1000 / 300_000) * 300_000);
 
-    const baseFootprint = baseTransaction.toEnvelope().v1().tx().ext().sorobanData().resources().footprint();
+    const baseFootprint = baseTransaction
+      .toEnvelope()
+      .v1()
+      .tx()
+      .ext()
+      .sorobanData()
+      .resources()
+      .footprint();
     const baseEntryCount = baseFootprint.readOnly().length + baseFootprint.readWrite().length;
 
     const extraROEntries: xdr.LedgerKey[] = [
@@ -115,9 +161,7 @@ describe('addReflectorEntries', () => {
       extraRWEntries.push(
         xdr.LedgerKey.contractData(
           new xdr.LedgerKeyContractData({
-            contract: Address.fromString(
-              NON_ORACLE_CONTRACT_ADDRESS
-            ).toScAddress(),
+            contract: Address.fromString(NON_ORACLE_CONTRACT_ADDRESS).toScAddress(),
             key: xdr.ScVal.scvU32(i),
             durability: xdr.ContractDataDurability.temporary(),
           })
@@ -140,10 +184,22 @@ describe('addReflectorEntries', () => {
       createReflectorEntry(3, nextRoundTimestamp, REFLECTOR_ORACLE_ADDRESSES[0]),
       createReflectorEntry(1, nextRoundTimestamp, REFLECTOR_ORACLE_ADDRESSES[1]),
     ];
-    const expectedTx = appendEntriesToTx(baseTransaction, expectedExtraROEntries, extraRWEntries, 100 * 3);
+    const expectedTx = appendEntriesToTx(
+      baseTransaction,
+      expectedExtraROEntries,
+      extraRWEntries,
+      100 * 3,
+      REFLECTOR_ENTRY_RESOURCE_FEE * 3n
+    );
 
-
-    const resultFootprint = expectedTx.toEnvelope().v1().tx().ext().sorobanData().resources().footprint();
+    const resultFootprint = expectedTx
+      .toEnvelope()
+      .v1()
+      .tx()
+      .ext()
+      .sorobanData()
+      .resources()
+      .footprint();
     const totalEntries = resultFootprint.readOnly().length + resultFootprint.readWrite().length;
     expect(totalEntries).toBeLessThanOrEqual(100);
     expect(resultTx).toEqual(expectedTx.toXDR());
@@ -177,7 +233,13 @@ describe('addReflectorEntries', () => {
       ...extraROEntries,
       createReflectorEntry(2, nextRoundTimestamp, REFLECTOR_ORACLE_ADDRESSES[2]),
     ];
-    const expectedTx = appendEntriesToTx(baseTransaction, expectedExtraROEntries, [], 100);
+    const expectedTx = appendEntriesToTx(
+      baseTransaction,
+      expectedExtraROEntries,
+      [],
+      100,
+      REFLECTOR_ENTRY_RESOURCE_FEE
+    );
 
     expect(resultTx).toEqual(expectedTx.toXDR());
   });
@@ -204,7 +266,13 @@ describe('addReflectorEntries', () => {
       createReflectorEntry(0, currRoundTimestamp, REFLECTOR_ORACLE_ADDRESSES[0]),
       createReflectorEntry(0, currRoundTimestamp + 300_000n, REFLECTOR_ORACLE_ADDRESSES[1]),
     ];
-    const expectedTx = appendEntriesToTx(baseTransaction, expectedExtraROEntries, [], 100 * 2);
+    const expectedTx = appendEntriesToTx(
+      baseTransaction,
+      expectedExtraROEntries,
+      [],
+      100 * 2,
+      REFLECTOR_ENTRY_RESOURCE_FEE * 2n
+    );
 
     expect(resultTx).toEqual(expectedTx.toXDR());
   });
@@ -236,7 +304,13 @@ describe('addReflectorEntries', () => {
       createReflectorEntry(1, currRoundTimestamp, REFLECTOR_ORACLE_ADDRESSES[1]),
       createReflectorEntry(0, currRoundTimestamp + 600_000n, REFLECTOR_ORACLE_ADDRESSES[0]),
     ];
-    const expectedTx = appendEntriesToTx(baseTransaction, expectedExtraROEntries, [], 100 * 3);
+    const expectedTx = appendEntriesToTx(
+      baseTransaction,
+      expectedExtraROEntries,
+      [],
+      100 * 3,
+      REFLECTOR_ENTRY_RESOURCE_FEE * 3n
+    );
 
     expect(resultTx).toEqual(expectedTx.toXDR());
   });
