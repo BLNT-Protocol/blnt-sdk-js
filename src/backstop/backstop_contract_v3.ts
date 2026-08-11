@@ -43,23 +43,6 @@ export interface PoolBackstopDataV3 {
   usdc: PoolTierDataV3;
 }
 
-export enum MigrationStatusV3 {
-  Pending = 'Pending',
-  Open = 'Open',
-  Active = 'Active',
-}
-
-export interface MigrationStateV3 {
-  activated_at: u64 | undefined;
-  backfill_end: u64 | undefined;
-  blnd_binding_verified: boolean;
-  funded_backfill: i128 | undefined;
-  migration_epoch_start: u64 | undefined;
-  scheduled_backfill: i128;
-  status: MigrationStatusV3;
-  verified_queue_unlock: u64 | undefined;
-}
-
 export interface BackstopConstructorArgsV3 {
   blnd_usdc_token: Address | string;
   blnd_xlm_token: Address | string;
@@ -113,54 +96,6 @@ function parseNative<T>(result: string): T {
   return scValToNative(xdr.ScVal.fromXDR(result, 'base64')) as T;
 }
 
-function parseMigrationStatus(value: unknown): MigrationStatusV3 {
-  const tag = Array.isArray(value)
-    ? value[0]
-    : typeof value === 'object' && value !== null && 'tag' in value
-    ? (value as { tag: unknown }).tag
-    : value;
-  switch (tag) {
-    case MigrationStatusV3.Pending:
-      return MigrationStatusV3.Pending;
-    case MigrationStatusV3.Open:
-      return MigrationStatusV3.Open;
-    case MigrationStatusV3.Active:
-      return MigrationStatusV3.Active;
-    default:
-      throw new Error(`Unknown v3 migration status: ${String(tag)}`);
-  }
-}
-
-function parseMigrationState(result: string): MigrationStateV3 {
-  const state = parseNative<
-    Omit<
-      MigrationStateV3,
-      | 'status'
-      | 'activated_at'
-      | 'backfill_end'
-      | 'funded_backfill'
-      | 'migration_epoch_start'
-      | 'verified_queue_unlock'
-    > & {
-      activated_at: u64 | null | undefined;
-      backfill_end: u64 | null | undefined;
-      funded_backfill: i128 | null | undefined;
-      migration_epoch_start: u64 | null | undefined;
-      status: unknown;
-      verified_queue_unlock: u64 | null | undefined;
-    }
-  >(result);
-  return {
-    ...state,
-    activated_at: state.activated_at ?? undefined,
-    backfill_end: state.backfill_end ?? undefined,
-    funded_backfill: state.funded_backfill ?? undefined,
-    migration_epoch_start: state.migration_epoch_start ?? undefined,
-    status: parseMigrationStatus(state.status),
-    verified_queue_unlock: state.verified_queue_unlock ?? undefined,
-  };
-}
-
 /**
  * Transaction and read-operation adapter for the Blend v3 backstop.
  *
@@ -177,10 +112,8 @@ export class BackstopContractV3 extends Contract {
     userBalance: (result: string): UserBalanceV3 => parseNative(result),
     poolData: (result: string): PoolBackstopDataV3 => parseNative(result),
     backstopToken: (result: string): string => parseNative(result),
-    migrationState: parseMigrationState,
     drop: () => {},
     distribute: (result: string): i128 => parseNative(result),
-    claimable: (result: string): i128 => parseNative(result),
     claim: (result: string): i128 => parseNative(result),
     gulpEmissions: (result: string): i128 => parseNative(result),
     rewardZone: (result: string): string[] => parseNative(result),
@@ -284,29 +217,12 @@ export class BackstopContractV3 extends Contract {
     return this.call('backstop_token', tierToScVal(tier)).toXDR('base64');
   }
 
-  migrationState(): string {
-    return this.call('migration_state').toXDR('base64');
-  }
-
   drop(): string {
     return this.call('drop').toXDR('base64');
   }
 
   distribute(): string {
     return this.call('distribute').toXDR('base64');
-  }
-
-  claimable(
-    tier: BackstopTierV3,
-    user: Address | string,
-    pool_addresses: Array<Address | string>
-  ): string {
-    return this.call(
-      'claimable',
-      tierToScVal(tier),
-      addressToScVal(user),
-      addressesToScVal(pool_addresses)
-    ).toXDR('base64');
   }
 
   claim(args: BackstopClaimArgsV3): string {

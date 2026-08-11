@@ -3,11 +3,11 @@ import { simulateAndParse } from '../simulation_helper.js';
 import {
   BackstopContractV3,
   BackstopTierV3,
-  MigrationStateV3,
   PoolBackstopDataV3,
   PoolTierDataV3,
   UserBalanceV3,
 } from './backstop_contract_v3.js';
+import { BackstopMigrationV3, MigrationStateV3 } from './backstop_migration_v3.js';
 
 /** Fixed v3 loss-waterfall order. */
 export const BACKSTOP_TIERS_V3 = [
@@ -160,11 +160,7 @@ export class BackstopV3 {
         contract.backstopToken(BackstopTierV3.Usdc),
         BackstopContractV3.parsers.backstopToken
       ),
-      simulateAndParse(
-        network,
-        contract.migrationState(),
-        BackstopContractV3.parsers.migrationState
-      ),
+      BackstopMigrationV3.load(network, id),
       simulateAndParse(network, contract.rewardZone(), BackstopContractV3.parsers.rewardZone),
     ]);
     return new BackstopV3(
@@ -174,7 +170,7 @@ export class BackstopV3 {
         [BackstopTierV3.BlndUsdc]: blndUsdc.result,
         [BackstopTierV3.Usdc]: usdc.result,
       },
-      migration.result,
+      migration.state,
       rewardZone.result,
       Math.max(
         blndXlm.latestLedger,

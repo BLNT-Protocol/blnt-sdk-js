@@ -6,6 +6,8 @@ export * from './backstop_config.js';
 export * from './backstop_contract.js';
 export * from './backstop_contract_v3.js';
 export * from './backstop_events.js';
+export * from './backstop_emissions_v3.js';
+export * from './backstop_migration_v3.js';
 export * from './backstop_pool.js';
 export * from './backstop_pool_est.js';
 export * from './backstop_pool_user.js';
