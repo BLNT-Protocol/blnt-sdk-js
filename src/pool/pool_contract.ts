@@ -10,6 +10,7 @@ import {
   ReserveEmissionMetadata,
   ReserveConfigV2,
   FlashLoan,
+  InterestReserveState,
 } from './index.js';
 import { EmissionDataV2, UserEmissions } from '../emissions.js';
 import { AuctionType } from './auction.js';
@@ -840,5 +841,29 @@ export class PoolContractV2 extends PoolContract {
       'get_reserve_list',
       ...PoolContractV2.spec.funcArgsToScVals('get_reserve_list', {})
     ).toXDR('base64');
+  }
+}
+
+/**
+ * V3 pool adapter.
+ *
+ * All inherited operations retain the v2 ABI. V3 adds a read-only view of the
+ * tiered interest allocation for one reserve.
+ */
+export class PoolContractV3 extends PoolContractV2 {
+  static readonly parsers = {
+    ...PoolContractV2.parsers,
+    interestReserveState: (result: string): InterestReserveState =>
+      scValToNative(xdr.ScVal.fromXDR(result, 'base64')) as InterestReserveState,
+  };
+
+  constructor(address: string) {
+    super(address);
+  }
+
+  interestReserveState(asset: Address | string): string {
+    const assetValue =
+      typeof asset === 'string' ? Address.fromString(asset).toScVal() : asset.toScVal();
+    return this.call('interest_reserve_state', assetValue).toXDR('base64');
   }
 }

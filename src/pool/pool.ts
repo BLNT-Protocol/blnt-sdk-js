@@ -123,3 +123,39 @@ export class PoolV2 extends Pool {
     return new PoolV2(network, id, metadata, reserves, timestamp);
   }
 }
+
+/**
+ * Manage ledger data for a Blend v3 pool.
+ *
+ * V3 deliberately preserves the v2 reserve and position representation, so
+ * the SDK reuses the v2 loader instead of maintaining a duplicate parser.
+ */
+export class PoolV3 extends PoolV2 {
+  version: Version = Version.V3;
+
+  public static async load(network: Network, id: string): Promise<PoolV3> {
+    const poolMetadata = await PoolMetadata.loadV3(network, id);
+    return await PoolV3.loadWithMetadata(network, id, poolMetadata);
+  }
+
+  public static async loadWithMetadata(
+    network: Network,
+    id: string,
+    metadata: PoolMetadata
+  ): Promise<PoolV3> {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const reserveList = await ReserveV2.loadList(
+      network,
+      id,
+      BigInt(metadata.backstopRate),
+      metadata.reserveList,
+      timestamp
+    );
+    const reserves = new Map<string, Reserve>();
+    for (const reserve of reserveList) {
+      reserves.set(reserve.assetId, reserve);
+    }
+
+    return new PoolV3(network, id, metadata, reserves, timestamp);
+  }
+}

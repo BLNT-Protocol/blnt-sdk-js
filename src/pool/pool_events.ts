@@ -274,6 +274,9 @@ export type PoolV2Event =
   | PoolDefaultedDebtEvent
   | PoolFlashLoanEvent;
 
+/** V3 preserves the v2 pool event schema. */
+export type PoolV3Event = PoolV2Event;
+
 /**
  * Create a PoolV1Event from a RawEventResponse.
  * @param eventResponse - The RawEventResponse from the RPC to convert
@@ -656,6 +659,13 @@ export function poolEventV2FromEventResponse(
   } else {
     return baseEvent;
   }
+}
+
+/** Parse a v3 pool event using its intentionally v2-compatible schema. */
+export function poolEventV3FromEventResponse(
+  eventResponse: rpc.Api.RawEventResponse
+): PoolV3Event | undefined {
+  return poolEventV2FromEventResponse(eventResponse);
 }
 
 /**

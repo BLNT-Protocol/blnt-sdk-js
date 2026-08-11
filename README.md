@@ -18,6 +18,36 @@ NOTE: There is an outstanding issue passing XDR objects between packages. See th
 
 Both the [blend-utils](https://github.com/blend-capital/blend-utils) and [blend-ui](https://github.com/blend-capital/blend-ui) repositories make extensive use of this SDK for reference.
 
+### Blend v3
+
+V3 reuses the v2 pool representation through `PoolV3` and `PoolContractV3`.
+Its backstop remains explicitly tiered:
+
+```ts
+import {
+  BackstopContractV3,
+  BackstopPoolV3,
+  BackstopTierV3,
+  Network,
+  PoolV3,
+} from '@blend-capital/blend-sdk';
+
+const pool = await PoolV3.load(network as Network, poolId);
+const backstop = await BackstopPoolV3.load(network as Network, backstopId, pool.id);
+const blndXlm = backstop.tier(BackstopTierV3.BlndXlm);
+
+const deposit = new BackstopContractV3(backstopId).deposit({
+  tier: BackstopTierV3.BlndXlm,
+  from: userId,
+  pool_address: pool.id,
+  amount: 100_0000000n,
+});
+```
+
+The SDK does not combine shares or token amounts across tiers. Use the
+canonical USDC valuation fields on `BackstopPoolV3` when comparing aggregate
+backstop value.
+
 ### Supply an Asset to a Pool
 
 The contract class creates an operation as a base64 XDR string that can be used with the `@stellar/stellar-sdk` [TransactionBuilder class](https://stellar.github.io/js-stellar-sdk/TransactionBuilder.html). When interacting with Soroban contracts, the invoker must populate the `SorobanData` portion of the transaction. The `@stellar/stellar-sdk` provides an easy way to do this by simulating the transaction against an RPC. For more details about how to submit a Soroban operation to the Stellar network, please see: https://developers.stellar.org/docs/build/guides/transactions/invoke-contract-tx-sdk
@@ -28,7 +58,7 @@ import { xdr } from '@stellar/stellar-sdk';
 
 const asset: Address = // C... the Address of the asset to lend
 const user: Address = // G... some Address
-const to_lend: bigint = // ... the amount to lend as a bigint fixed point number with the tokens decimals 
+const to_lend: bigint = // ... the amount to lend as a bigint fixed point number with the tokens decimals
 
 const pool_contract = new PoolContract(poolId);
 const supply_op = xdr.Operation.fromXDR(

@@ -23,6 +23,14 @@ export interface ReserveEmissionMetadata {
   share: u64;
 }
 
+/** Pending take-rate assets apportioned to each v3 backstop tier. */
+export interface InterestReserveState {
+  blnd_usdc: i128;
+  blnd_xlm: i128;
+  carry: i128;
+  usdc: i128;
+}
+
 export interface UserReserveKey {
   reserve_id: u32;
   user: string;
