@@ -26,14 +26,14 @@ export class BackstopTierPoolV3 {
     if (this.data.shares === 0n) {
       return shares;
     }
-    return (shares * this.data.assets) / this.data.shares;
+    return (shares * this.data.tokens) / this.data.shares;
   }
 
   public tokensToShares(tokens: bigint): bigint {
-    if (this.data.assets === 0n || this.data.shares === 0n) {
+    if (this.data.tokens === 0n || this.data.shares === 0n) {
       return tokens;
     }
-    return (tokens * this.data.shares) / this.data.assets;
+    return (tokens * this.data.shares) / this.data.tokens;
   }
 }
 
@@ -68,14 +68,11 @@ export class BackstopPoolV3 {
   }
 
   public totalActiveValue(): bigint {
-    return BACKSTOP_TIERS_V3.reduce(
-      (total, tier) => total + this.tiers[tier].data.active_value,
-      0n
-    );
+    return this.data.active_value;
   }
 
   public totalValue(): bigint {
-    return BACKSTOP_TIERS_V3.reduce((total, tier) => total + this.tiers[tier].data.total_value, 0n);
+    return BACKSTOP_TIERS_V3.reduce((total, tier) => total + this.tiers[tier].data.value, 0n);
   }
 }
 

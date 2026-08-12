@@ -27,19 +27,16 @@ export interface UserBalanceV3 {
 }
 
 export interface PoolTierDataV3 {
-  active_blnd: i128;
-  active_value: i128;
-  assets: i128;
-  queued_shares: i128;
-  queued_value: i128;
+  tokens: i128;
   shares: i128;
-  total_value: i128;
+  value: i128;
 }
 
 export interface PoolBackstopDataV3 {
+  active_value: i128;
   blnd_usdc: PoolTierDataV3;
   blnd_xlm: PoolTierDataV3;
-  q4w_percentage: i128;
+  q4w_pct: i128;
   usdc: PoolTierDataV3;
 }
 

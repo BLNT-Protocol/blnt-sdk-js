@@ -35,15 +35,11 @@ function u64(value: bigint): xdr.ScVal {
   return nativeToScVal(value, { type: 'u64' });
 }
 
-function tierData(activeValue: bigint, assets: bigint, shares: bigint, queuedShares: bigint) {
+function tierData(value: bigint, tokens: bigint, shares: bigint) {
   return {
-    active_blnd: 0n,
-    active_value: activeValue,
-    assets,
-    queued_shares: queuedShares,
-    queued_value: 0n,
+    tokens,
     shares,
-    total_value: activeValue,
+    value,
   };
 }
 
@@ -121,17 +117,19 @@ describe('Blend v3 SDK adapters', () => {
 
   test('keeps tier exchange rates and values independent', () => {
     const data: PoolBackstopDataV3 = {
-      blnd_xlm: tierData(4_000n, 2_000n, 1_000n, 100n),
-      blnd_usdc: tierData(3_000n, 3_000n, 1_500n, 200n),
-      usdc: tierData(2_000n, 2_000n, 2_000n, 300n),
-      q4w_percentage: 1_000_000n,
+      active_value: 8_100n,
+      blnd_xlm: tierData(4_000n, 2_000n, 1_000n),
+      blnd_usdc: tierData(3_000n, 3_000n, 1_500n),
+      usdc: tierData(2_000n, 2_000n, 2_000n),
+      q4w_pct: 1_000_000n,
     };
     const pool = new BackstopPoolV3(data, 123);
 
     expect(pool.tier(BackstopTierV3.BlndXlm).sharesToTokens(250n)).toEqual(500n);
     expect(pool.tier(BackstopTierV3.BlndUsdc).sharesToTokens(250n)).toEqual(500n);
     expect(pool.tier(BackstopTierV3.Usdc).sharesToTokens(250n)).toEqual(250n);
-    expect(pool.totalActiveValue()).toEqual(9_000n);
+    expect(pool.totalActiveValue()).toEqual(8_100n);
+    expect(pool.totalValue()).toEqual(9_000n);
   });
 
   test('estimates v3 backstop BLND without contract-internal carry', () => {
