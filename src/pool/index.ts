@@ -8,6 +8,7 @@ export * from './pool_contract.js';
 export * from './pool_est.js';
 export * from './pool_events.js';
 export * from './pool_oracle.js';
+export * from './pool_interest_reserve_v3.js';
 export * from './pool_user.js';
 export * from './reserve.js';
 export * from './reserve_types.js';
@@ -21,14 +22,6 @@ export interface ReserveEmissionMetadata {
   res_index: u32;
   res_type: u32;
   share: u64;
-}
-
-/** Pending take-rate assets apportioned to each v3 backstop tier. */
-export interface InterestReserveState {
-  blnd_usdc: i128;
-  blnd_xlm: i128;
-  carry: i128;
-  usdc: i128;
 }
 
 export interface UserReserveKey {

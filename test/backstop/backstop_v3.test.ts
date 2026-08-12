@@ -5,9 +5,9 @@ import {
   estimatePoolClaimableV3,
   BackstopPoolV3,
   BackstopTierV3,
+  decodeInterestReserveStateV3,
   MigrationStatusV3,
   PoolBackstopDataV3,
-  PoolContractV3,
 } from '../../src/index.js';
 import { Address, Keypair, nativeToScVal, scValToNative, StrKey, xdr } from '@stellar/stellar-sdk';
 
@@ -166,23 +166,37 @@ describe('Blend v3 SDK adapters', () => {
     ).toEqual(17n);
   });
 
-  test('encodes and parses the v3 interest-reserve view', () => {
-    const contract = new PoolContractV3(contractId);
-    const view = invocation(contract.interestReserveState(poolId));
-    expect(view.functionName().toString()).toEqual('interest_reserve_state');
-    expect(scValToNative(view.args()[0])).toEqual(poolId);
-
+  test('decodes v3 interest-reserve state from persistent storage', () => {
     const encoded = xdr.ScVal.scvMap([
       mapEntry('blnd_usdc', i128(3n)),
       mapEntry('blnd_xlm', i128(4n)),
       mapEntry('carry', i128(1n)),
       mapEntry('usdc', i128(2n)),
     ]);
-    expect(PoolContractV3.parsers.interestReserveState(encoded.toXDR('base64'))).toEqual({
+    expect(decodeInterestReserveStateV3(encoded)).toEqual({
       blnd_usdc: 3n,
       blnd_xlm: 4n,
       carry: 1n,
       usdc: 2n,
     });
+    expect(decodeInterestReserveStateV3()).toEqual({
+      blnd_usdc: 0n,
+      blnd_xlm: 0n,
+      carry: 0n,
+      usdc: 0n,
+    });
+    expect(() =>
+      decodeInterestReserveStateV3(
+        xdr.ScVal.scvMap([
+          mapEntry('blnd_usdc', i128(-1n)),
+          mapEntry('blnd_xlm', i128(0n)),
+          mapEntry('carry', i128(0n)),
+          mapEntry('usdc', i128(0n)),
+        ])
+      )
+    ).toThrow('Invalid v3 interest-reserve state');
+    expect(() => decodeInterestReserveStateV3(xdr.ScVal.scvBool(true))).toThrow(
+      'Invalid v3 interest-reserve state'
+    );
   });
 });
