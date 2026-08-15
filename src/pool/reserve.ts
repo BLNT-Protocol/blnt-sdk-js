@@ -3,6 +3,7 @@ import {
   EmissionConfig,
   EmissionData,
   EmissionDataV2,
+  EmissionDataV3,
   Emissions,
   EmissionsV1,
   EmissionsV2,
@@ -838,7 +839,8 @@ export class ReserveV2 extends Reserve {
     poolId: string,
     backstopTakeRate: bigint,
     reserveList: string[],
-    timestamp?: number
+    timestamp?: number,
+    version: Version = Version.V2
   ): Promise<Reserve[]> {
     const reserves = new Array<Reserve>();
     const stellarRpc = new rpc.Server(network.rpc, network.opts);
@@ -880,7 +882,11 @@ export class ReserveV2 extends Reserve {
 
         case `EmisData`: {
           const emissionIndex = getEmissionIndex(ledgerEntry);
-          emissionDataMap.set(emissionIndex, EmissionDataV2.fromLedgerEntryData(ledgerEntry));
+          const emissionData =
+            version === Version.V3
+              ? EmissionDataV3.fromLedgerEntryData(ledgerEntry)
+              : EmissionDataV2.fromLedgerEntryData(ledgerEntry);
+          emissionDataMap.set(emissionIndex, emissionData);
           break;
         }
         default:

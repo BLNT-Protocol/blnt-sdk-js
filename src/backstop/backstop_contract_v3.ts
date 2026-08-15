@@ -40,6 +40,24 @@ export interface PoolBackstopDataV3 {
   usdc: PoolTierDataV3;
 }
 
+export interface DeployedPoolTierDataV3 {
+  active_blnd: i128;
+  active_value: i128;
+  assets: i128;
+  queued_shares: i128;
+  queued_value: i128;
+  shares: i128;
+  total_value: i128;
+}
+
+export interface DeployedPoolBackstopDataV3 {
+  blnd_usdc: DeployedPoolTierDataV3;
+  blnd_xlm: DeployedPoolTierDataV3;
+  q4w_percentage: i128;
+  usdc: DeployedPoolTierDataV3;
+  valuation_valid_until?: u64;
+}
+
 export interface BackstopConstructorArgsV3 {
   blnd_usdc_token: Address | string;
   blnd_xlm_token: Address | string;
@@ -93,6 +111,25 @@ function parseNative<T>(result: string): T {
   return scValToNative(xdr.ScVal.fromXDR(result, 'base64')) as T;
 }
 
+/** Normalize the deployed and compact candidate pool-data layouts. */
+export function normalizePoolBackstopDataV3(
+  data: PoolBackstopDataV3 | DeployedPoolBackstopDataV3
+): PoolBackstopDataV3 {
+  if ('active_value' in data) return data;
+  const normalizeTier = (tier: DeployedPoolTierDataV3): PoolTierDataV3 => ({
+    tokens: tier.assets,
+    shares: tier.shares,
+    value: tier.total_value,
+  });
+  return {
+    active_value: data.blnd_xlm.active_value + data.blnd_usdc.active_value + data.usdc.active_value,
+    blnd_xlm: normalizeTier(data.blnd_xlm),
+    blnd_usdc: normalizeTier(data.blnd_usdc),
+    q4w_pct: data.q4w_percentage,
+    usdc: normalizeTier(data.usdc),
+  };
+}
+
 /**
  * Transaction and read-operation adapter for the Blend v3 backstop.
  *
@@ -107,7 +144,10 @@ export class BackstopContractV3 extends Contract {
     dequeueWithdrawal: () => {},
     withdraw: (result: string): i128 => parseNative(result),
     userBalance: (result: string): UserBalanceV3 => parseNative(result),
-    poolData: (result: string): PoolBackstopDataV3 => parseNative(result),
+    poolData: (result: string): PoolBackstopDataV3 =>
+      normalizePoolBackstopDataV3(
+        parseNative<PoolBackstopDataV3 | DeployedPoolBackstopDataV3>(result)
+      ),
     backstopToken: (result: string): string => parseNative(result),
     drop: () => {},
     distribute: (result: string): i128 => parseNative(result),

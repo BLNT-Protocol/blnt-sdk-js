@@ -149,7 +149,8 @@ export class PoolV3 extends PoolV2 {
       id,
       BigInt(metadata.backstopRate),
       metadata.reserveList,
-      timestamp
+      timestamp,
+      Version.V3
     );
     const reserves = new Map<string, Reserve>();
     for (const reserve of reserveList) {

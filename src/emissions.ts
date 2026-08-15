@@ -274,7 +274,10 @@ export class EmissionDataV2 extends EmissionData {
     super(index, lastTime);
   }
 
-  static fromLedgerEntryData(ledger_entry_data: xdr.LedgerEntryData | string): EmissionDataV2 {
+  static fromLedgerEntryData(
+    ledger_entry_data: xdr.LedgerEntryData | string,
+    allowV3CarryFields = false
+  ): EmissionDataV2 {
     if (typeof ledger_entry_data == 'string') {
       ledger_entry_data = xdr.LedgerEntryData.fromXDR(ledger_entry_data, 'base64');
     }
@@ -303,6 +306,13 @@ export class EmissionDataV2 extends EmissionData {
         case 'last_time':
           last_time = Number(scValToNative(map_entry.val()));
           break;
+        case 'carry_initialized':
+        case 'index_carry':
+        case 'remaining':
+          if (allowV3CarryFields) {
+            break;
+          }
+          throw new Error(`EmissionData invalid key: should not contain ${key}`);
         default:
           throw new Error(`EmissionData invalid key: should not contain ${key}`);
       }
@@ -318,6 +328,18 @@ export class EmissionDataV2 extends EmissionData {
     }
 
     return new EmissionDataV2(expiration, eps, index, last_time);
+  }
+}
+
+/**
+ * V3 persists exact rounding carry alongside the v2 emission fields. The carry
+ * remains contract-internal; SDK estimates intentionally use the public,
+ * v2-compatible emission values.
+ */
+export class EmissionDataV3 extends EmissionDataV2 {
+  static fromLedgerEntryData(ledger_entry_data: xdr.LedgerEntryData | string): EmissionDataV3 {
+    const data = EmissionDataV2.fromLedgerEntryData(ledger_entry_data, true);
+    return new EmissionDataV3(data.expiration, data.eps, data.index, data.lastTime);
   }
 }
 

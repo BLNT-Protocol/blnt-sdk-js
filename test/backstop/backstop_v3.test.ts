@@ -7,6 +7,7 @@ import {
   BackstopTierV3,
   decodeInterestReserveStateV3,
   MigrationStatusV3,
+  normalizePoolBackstopDataV3,
   PoolBackstopDataV3,
 } from '../../src/index.js';
 import { Address, Keypair, nativeToScVal, scValToNative, StrKey, xdr } from '@stellar/stellar-sdk';
@@ -130,6 +131,32 @@ describe('Blend v3 SDK adapters', () => {
     expect(pool.tier(BackstopTierV3.Usdc).sharesToTokens(250n)).toEqual(250n);
     expect(pool.totalActiveValue()).toEqual(8_100n);
     expect(pool.totalValue()).toEqual(9_000n);
+  });
+
+  test('normalizes the deployed rich pool-data layout', () => {
+    const tier = (assets: bigint, activeValue: bigint, totalValue: bigint) => ({
+      active_blnd: 0n,
+      active_value: activeValue,
+      assets,
+      queued_shares: 0n,
+      queued_value: 0n,
+      shares: assets,
+      total_value: totalValue,
+    });
+    expect(
+      normalizePoolBackstopDataV3({
+        blnd_usdc: tier(10n, 20n, 21n),
+        blnd_xlm: tier(30n, 40n, 41n),
+        q4w_percentage: 5n,
+        usdc: tier(50n, 60n, 61n),
+      })
+    ).toEqual({
+      active_value: 120n,
+      blnd_usdc: { tokens: 10n, shares: 10n, value: 21n },
+      blnd_xlm: { tokens: 30n, shares: 30n, value: 41n },
+      q4w_pct: 5n,
+      usdc: { tokens: 50n, shares: 50n, value: 61n },
+    });
   });
 
   test('estimates v3 backstop BLND without contract-internal carry', () => {
