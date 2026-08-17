@@ -88,6 +88,10 @@ describe('Blend v3 SDK adapters', () => {
     expect(withdrawal.functionName().toString()).toEqual('withdraw');
     expect(withdrawal.args()).toHaveLength(5);
     expect(withdrawal.args()[0].vec()?.[0].sym().toString()).toEqual('Usdc');
+
+    const buyAndBurn = invocation(contract.buyAndBurn());
+    expect(buyAndBurn.functionName().toString()).toEqual('buy_and_burn');
+    expect(buyAndBurn.args()).toHaveLength(0);
   });
 
   test('decodes exact v3 migration state from contract-instance storage', () => {

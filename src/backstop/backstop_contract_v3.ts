@@ -150,6 +150,7 @@ export class BackstopContractV3 extends Contract {
       ),
     backstopToken: (result: string): string => parseNative(result),
     drop: () => {},
+    buyAndBurn: (result: string): i128 => parseNative(result),
     distribute: (result: string): i128 => parseNative(result),
     claim: (result: string): i128 => parseNative(result),
     gulpEmissions: (result: string): i128 => parseNative(result),
@@ -256,6 +257,10 @@ export class BackstopContractV3 extends Contract {
 
   drop(): string {
     return this.call('drop').toXDR('base64');
+  }
+
+  buyAndBurn(): string {
+    return this.call('buy_and_burn').toXDR('base64');
   }
 
   distribute(): string {
