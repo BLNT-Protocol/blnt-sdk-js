@@ -9,14 +9,21 @@ import {
 } from './backstop_contract_v3.js';
 import { BackstopMigrationV3, MigrationStateV3 } from './backstop_migration_v3.js';
 
-/** Fixed v3 loss-waterfall order. */
+/** All representable v3 loss-waterfall positions, in order. */
 export const BACKSTOP_TIERS_V3 = [
-  BackstopTierV3.BlndXlm,
-  BackstopTierV3.BlndUsdc,
-  BackstopTierV3.Usdc,
+  BackstopTierV3.FirstLoss,
+  BackstopTierV3.SecondLoss,
+  BackstopTierV3.ThirdLoss,
 ] as const;
 
-export type BackstopTierMapV3<T> = Record<BackstopTierV3, T>;
+export type BackstopTierMapV3<T> = Partial<Record<BackstopTierV3, T>>;
+
+export function configuredBackstopTiersV3(count: number): BackstopTierV3[] {
+  if (!Number.isInteger(count) || count < 1 || count > BACKSTOP_TIERS_V3.length) {
+    throw new Error('A v3 pool must configure between one and three backstop tiers');
+  }
+  return BACKSTOP_TIERS_V3.slice(0, count);
+}
 
 /** One independently accounted v3 backstop tier for a pool. */
 export class BackstopTierPoolV3 {
@@ -37,16 +44,17 @@ export class BackstopTierPoolV3 {
   }
 }
 
-/** Canonical three-tier accounting and valuation for one v3 pool. */
+/** Immutable tier accounting and valuation for one v3 pool. */
 export class BackstopPoolV3 {
   public readonly tiers: BackstopTierMapV3<BackstopTierPoolV3>;
+  public readonly configuredTiers: BackstopTierV3[];
 
   constructor(public data: PoolBackstopDataV3, public latestLedger: number) {
-    this.tiers = {
-      [BackstopTierV3.BlndXlm]: new BackstopTierPoolV3(BackstopTierV3.BlndXlm, data.blnd_xlm),
-      [BackstopTierV3.BlndUsdc]: new BackstopTierPoolV3(BackstopTierV3.BlndUsdc, data.blnd_usdc),
-      [BackstopTierV3.Usdc]: new BackstopTierPoolV3(BackstopTierV3.Usdc, data.usdc),
-    };
+    this.configuredTiers = configuredBackstopTiersV3(data.tiers.length);
+    this.tiers = {};
+    this.configuredTiers.forEach((tier, index) => {
+      this.tiers[tier] = new BackstopTierPoolV3(tier, data.tiers[index]);
+    });
   }
 
   public static async load(
@@ -64,7 +72,9 @@ export class BackstopPoolV3 {
   }
 
   public tier(tier: BackstopTierV3): BackstopTierPoolV3 {
-    return this.tiers[tier];
+    const result = this.tiers[tier];
+    if (result === undefined) throw new Error(`${tier} is not configured for this pool`);
+    return result;
   }
 
   public totalActiveValue(): bigint {
@@ -72,7 +82,7 @@ export class BackstopPoolV3 {
   }
 
   public totalValue(): bigint {
-    return BACKSTOP_TIERS_V3.reduce((total, tier) => total + this.tiers[tier].data.value, 0n);
+    return this.configuredTiers.reduce((total, tier) => total + this.tier(tier).data.value, 0n);
   }
 }
 
@@ -92,8 +102,9 @@ export class BackstopPoolUserV3 {
     userId: string
   ): Promise<BackstopPoolUserV3> {
     const contract = new BackstopContractV3(backstopId);
+    const pool = await BackstopPoolV3.load(network, backstopId, poolId);
     const responses = await Promise.all(
-      BACKSTOP_TIERS_V3.map((tier) =>
+      pool.configuredTiers.map((tier) =>
         simulateAndParse(
           network,
           contract.userBalance(tier, poolId, userId),
@@ -102,7 +113,7 @@ export class BackstopPoolUserV3 {
       )
     );
     const balances = {} as BackstopTierMapV3<UserBalanceV3>;
-    BACKSTOP_TIERS_V3.forEach((tier, index) => {
+    pool.configuredTiers.forEach((tier, index) => {
       balances[tier] = responses[index].result;
     });
     return new BackstopPoolUserV3(
@@ -114,26 +125,27 @@ export class BackstopPoolUserV3 {
   }
 
   public balance(tier: BackstopTierV3): UserBalanceV3 {
-    return this.balances[tier];
+    const result = this.balances[tier];
+    if (result === undefined) throw new Error(`${tier} is not configured for this pool`);
+    return result;
   }
 
   public queuedShares(tier: BackstopTierV3): bigint {
-    return this.balances[tier].q4w.reduce((total, item) => total + item.amount, 0n);
+    return this.balance(tier).q4w.reduce((total, item) => total + item.amount, 0n);
   }
 
   public unlockedQueuedShares(tier: BackstopTierV3, timestamp: number): bigint {
-    return this.balances[tier].q4w.reduce(
+    return this.balance(tier).q4w.reduce(
       (total, item) => (item.exp <= BigInt(timestamp) ? total + item.amount : total),
       0n
     );
   }
 }
 
-/** Immutable token bindings and migration state for the v3 backstop. */
+/** Global migration and reward-zone state for the v3 backstop. */
 export class BackstopV3 {
   constructor(
     public id: string,
-    public tokens: BackstopTierMapV3<string>,
     public migration: MigrationStateV3,
     public rewardZone: string[],
     public latestLedger: number
@@ -141,41 +153,15 @@ export class BackstopV3 {
 
   public static async load(network: Network, id: string): Promise<BackstopV3> {
     const contract = new BackstopContractV3(id);
-    const [blndXlm, blndUsdc, usdc, migration, rewardZone] = await Promise.all([
-      simulateAndParse(
-        network,
-        contract.backstopToken(BackstopTierV3.BlndXlm),
-        BackstopContractV3.parsers.backstopToken
-      ),
-      simulateAndParse(
-        network,
-        contract.backstopToken(BackstopTierV3.BlndUsdc),
-        BackstopContractV3.parsers.backstopToken
-      ),
-      simulateAndParse(
-        network,
-        contract.backstopToken(BackstopTierV3.Usdc),
-        BackstopContractV3.parsers.backstopToken
-      ),
+    const [migration, rewardZone] = await Promise.all([
       BackstopMigrationV3.load(network, id),
       simulateAndParse(network, contract.rewardZone(), BackstopContractV3.parsers.rewardZone),
     ]);
     return new BackstopV3(
       id,
-      {
-        [BackstopTierV3.BlndXlm]: blndXlm.result,
-        [BackstopTierV3.BlndUsdc]: blndUsdc.result,
-        [BackstopTierV3.Usdc]: usdc.result,
-      },
       migration.state,
       rewardZone.result,
-      Math.max(
-        blndXlm.latestLedger,
-        blndUsdc.latestLedger,
-        usdc.latestLedger,
-        migration.latestLedger,
-        rewardZone.latestLedger
-      )
+      Math.max(migration.latestLedger, rewardZone.latestLedger)
     );
   }
 }

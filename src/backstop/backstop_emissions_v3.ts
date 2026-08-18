@@ -96,11 +96,11 @@ function poolLedgerKeys(
   const tierKey = poolTierKey(pool, tier);
   const userTierKey = poolUserTierKey(pool, tier, user);
   const poolBalanceKey =
-    tier === BackstopTierV3.BlndUsdc
+    tier === BackstopTierV3.SecondLoss
       ? enumKey('PoolBalance', Address.fromString(pool).toScVal())
       : enumKey('TierPoolBalance', tierKey);
   const userBalanceKey =
-    tier === BackstopTierV3.BlndUsdc
+    tier === BackstopTierV3.SecondLoss
       ? enumKey('UserBalance', poolUserKey(pool, user))
       : enumKey('TierUserBalance', userTierKey);
   return [
@@ -146,9 +146,6 @@ function parseUserEmission(value: xdr.ScVal): UserEmissionEstimateDataV3 {
 }
 
 function validateClaimRequest(tier: BackstopTierV3, pools: string[]): void {
-  if (tier === BackstopTierV3.Usdc) {
-    throw new Error('Plain USDC is not eligible for BLND emissions');
-  }
   if (pools.length === 0 || new Set(pools).size !== pools.length) {
     throw new Error('Claim estimate requires unique pool addresses');
   }

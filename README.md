@@ -34,10 +34,10 @@ import {
 
 const pool = await PoolV3.load(network as Network, poolId);
 const backstop = await BackstopPoolV3.load(network as Network, backstopId, pool.id);
-const blndXlm = backstop.tier(BackstopTierV3.BlndXlm);
+const firstLoss = backstop.tier(BackstopTierV3.FirstLoss);
 
 const deposit = new BackstopContractV3(backstopId).deposit({
-  tier: BackstopTierV3.BlndXlm,
+  tier: BackstopTierV3.FirstLoss,
   from: userId,
   pool_address: pool.id,
   amount: 100_0000000n,

@@ -3,17 +3,17 @@ import { i128, Network } from '../index.js';
 
 /** Pending take-rate assets apportioned to each v3 backstop tier. */
 export interface InterestReserveStateV3 {
-  blnd_usdc: i128;
-  blnd_xlm: i128;
   carry: i128;
-  usdc: i128;
+  first_loss: i128;
+  second_loss: i128;
+  third_loss: i128;
 }
 
 const EMPTY_INTEREST_RESERVE_STATE: InterestReserveStateV3 = {
-  blnd_usdc: 0n,
-  blnd_xlm: 0n,
   carry: 0n,
-  usdc: 0n,
+  first_loss: 0n,
+  second_loss: 0n,
+  third_loss: 0n,
 };
 
 function reserveStateKey(poolId: string, asset: string): xdr.LedgerKey {
@@ -41,22 +41,22 @@ export function decodeInterestReserveStateV3(value?: xdr.ScVal): InterestReserve
   }
   const state = decoded as Partial<InterestReserveStateV3>;
   if (
-    typeof state.blnd_usdc !== 'bigint' ||
-    typeof state.blnd_xlm !== 'bigint' ||
     typeof state.carry !== 'bigint' ||
-    typeof state.usdc !== 'bigint' ||
-    state.blnd_usdc < 0n ||
-    state.blnd_xlm < 0n ||
+    typeof state.first_loss !== 'bigint' ||
+    typeof state.second_loss !== 'bigint' ||
+    typeof state.third_loss !== 'bigint' ||
     state.carry < 0n ||
-    state.usdc < 0n
+    state.first_loss < 0n ||
+    state.second_loss < 0n ||
+    state.third_loss < 0n
   ) {
     throw new Error('Invalid v3 interest-reserve state');
   }
   return {
-    blnd_usdc: state.blnd_usdc,
-    blnd_xlm: state.blnd_xlm,
     carry: state.carry,
-    usdc: state.usdc,
+    first_loss: state.first_loss,
+    second_loss: state.second_loss,
+    third_loss: state.third_loss,
   };
 }
 

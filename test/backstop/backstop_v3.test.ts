@@ -1,13 +1,13 @@
 import { Buffer } from 'buffer';
 import {
   BackstopContractV3,
+  BackstopAssetV3,
   decodeMigrationStateV3,
   estimatePoolClaimableV3,
   BackstopPoolV3,
   BackstopTierV3,
   decodeInterestReserveStateV3,
   MigrationStatusV3,
-  normalizePoolBackstopDataV3,
   PoolBackstopDataV3,
 } from '../../src/index.js';
 import { Address, Keypair, nativeToScVal, scValToNative, StrKey, xdr } from '@stellar/stellar-sdk';
@@ -38,6 +38,10 @@ function u64(value: bigint): xdr.ScVal {
 
 function tierData(value: bigint, tokens: bigint, shares: bigint) {
   return {
+    asset: BackstopAssetV3.BlndXlm,
+    blnd_emission_eligible: true,
+    take_rate_weight: 1,
+    token: contractId,
     tokens,
     shares,
     value,
@@ -49,7 +53,7 @@ describe('Blend v3 SDK adapters', () => {
     const contract = new BackstopContractV3(contractId);
     const deposit = invocation(
       contract.deposit({
-        tier: BackstopTierV3.BlndXlm,
+        tier: BackstopTierV3.FirstLoss,
         from: userId,
         pool_address: poolId,
         amount: 25n,
@@ -58,27 +62,27 @@ describe('Blend v3 SDK adapters', () => {
 
     expect(deposit.functionName().toString()).toEqual('deposit');
     expect(deposit.args()).toHaveLength(4);
-    expect(deposit.args()[0].vec()?.[0].sym().toString()).toEqual('BlndXlm');
+    expect(deposit.args()[0].vec()?.[0].sym().toString()).toEqual('FirstLoss');
     expect(scValToNative(deposit.args()[1])).toEqual(userId);
     expect(scValToNative(deposit.args()[2])).toEqual(poolId);
     expect(scValToNative(deposit.args()[3])).toEqual(25n);
 
     const claim = invocation(
       contract.claim({
-        tier: BackstopTierV3.BlndUsdc,
+        tier: BackstopTierV3.SecondLoss,
         from: userId,
         pool_addresses: [poolId],
         min_lp_tokens_out: 10n,
       })
     );
     expect(claim.functionName().toString()).toEqual('claim');
-    expect(claim.args()[0].vec()?.[0].sym().toString()).toEqual('BlndUsdc');
+    expect(claim.args()[0].vec()?.[0].sym().toString()).toEqual('SecondLoss');
     expect(claim.args()[2].vec()).toHaveLength(1);
     expect(scValToNative(claim.args()[3])).toEqual(10n);
 
     const withdrawal = invocation(
       contract.withdraw({
-        tier: BackstopTierV3.Usdc,
+        tier: BackstopTierV3.ThirdLoss,
         from: userId,
         pool_address: poolId,
         amount: 5n,
@@ -87,11 +91,12 @@ describe('Blend v3 SDK adapters', () => {
     );
     expect(withdrawal.functionName().toString()).toEqual('withdraw');
     expect(withdrawal.args()).toHaveLength(5);
-    expect(withdrawal.args()[0].vec()?.[0].sym().toString()).toEqual('Usdc');
+    expect(withdrawal.args()[0].vec()?.[0].sym().toString()).toEqual('ThirdLoss');
 
-    const buyAndBurn = invocation(contract.buyAndBurn());
+    const buyAndBurn = invocation(contract.buyAndBurn(BackstopAssetV3.Xlm));
     expect(buyAndBurn.functionName().toString()).toEqual('buy_and_burn');
-    expect(buyAndBurn.args()).toHaveLength(0);
+    expect(buyAndBurn.args()).toHaveLength(1);
+    expect(buyAndBurn.args()[0].vec()?.[0].sym().toString()).toEqual('Xlm');
   });
 
   test('decodes exact v3 migration state from contract-instance storage', () => {
@@ -123,44 +128,30 @@ describe('Blend v3 SDK adapters', () => {
   test('keeps tier exchange rates and values independent', () => {
     const data: PoolBackstopDataV3 = {
       active_value: 8_100n,
-      blnd_xlm: tierData(4_000n, 2_000n, 1_000n),
-      blnd_usdc: tierData(3_000n, 3_000n, 1_500n),
-      usdc: tierData(2_000n, 2_000n, 2_000n),
       q4w_pct: 1_000_000n,
+      tiers: [
+        tierData(4_000n, 2_000n, 1_000n),
+        tierData(3_000n, 3_000n, 1_500n),
+        tierData(2_000n, 2_000n, 2_000n),
+      ],
     };
     const pool = new BackstopPoolV3(data, 123);
 
-    expect(pool.tier(BackstopTierV3.BlndXlm).sharesToTokens(250n)).toEqual(500n);
-    expect(pool.tier(BackstopTierV3.BlndUsdc).sharesToTokens(250n)).toEqual(500n);
-    expect(pool.tier(BackstopTierV3.Usdc).sharesToTokens(250n)).toEqual(250n);
+    expect(pool.tier(BackstopTierV3.FirstLoss).sharesToTokens(250n)).toEqual(500n);
+    expect(pool.tier(BackstopTierV3.SecondLoss).sharesToTokens(250n)).toEqual(500n);
+    expect(pool.tier(BackstopTierV3.ThirdLoss).sharesToTokens(250n)).toEqual(250n);
     expect(pool.totalActiveValue()).toEqual(8_100n);
     expect(pool.totalValue()).toEqual(9_000n);
   });
 
-  test('normalizes the deployed rich pool-data layout', () => {
-    const tier = (assets: bigint, activeValue: bigint, totalValue: bigint) => ({
-      active_blnd: 0n,
-      active_value: activeValue,
-      assets,
-      queued_shares: 0n,
-      queued_value: 0n,
-      shares: assets,
-      total_value: totalValue,
-    });
+  test('rejects pool data outside the one-to-three tier bound', () => {
     expect(
-      normalizePoolBackstopDataV3({
-        blnd_usdc: tier(10n, 20n, 21n),
-        blnd_xlm: tier(30n, 40n, 41n),
-        q4w_percentage: 5n,
-        usdc: tier(50n, 60n, 61n),
-      })
-    ).toEqual({
-      active_value: 120n,
-      blnd_usdc: { tokens: 10n, shares: 10n, value: 21n },
-      blnd_xlm: { tokens: 30n, shares: 30n, value: 41n },
-      q4w_pct: 5n,
-      usdc: { tokens: 50n, shares: 50n, value: 61n },
-    });
+      () =>
+        new BackstopPoolV3(
+          { active_value: 0n, q4w_pct: 0n, tiers: [] },
+          1
+        )
+    ).toThrow('between one and three');
   });
 
   test('estimates v3 backstop BLND without contract-internal carry', () => {
@@ -197,30 +188,30 @@ describe('Blend v3 SDK adapters', () => {
 
   test('decodes v3 interest-reserve state from persistent storage', () => {
     const encoded = xdr.ScVal.scvMap([
-      mapEntry('blnd_usdc', i128(3n)),
-      mapEntry('blnd_xlm', i128(4n)),
       mapEntry('carry', i128(1n)),
-      mapEntry('usdc', i128(2n)),
+      mapEntry('first_loss', i128(4n)),
+      mapEntry('second_loss', i128(3n)),
+      mapEntry('third_loss', i128(2n)),
     ]);
     expect(decodeInterestReserveStateV3(encoded)).toEqual({
-      blnd_usdc: 3n,
-      blnd_xlm: 4n,
       carry: 1n,
-      usdc: 2n,
+      first_loss: 4n,
+      second_loss: 3n,
+      third_loss: 2n,
     });
     expect(decodeInterestReserveStateV3()).toEqual({
-      blnd_usdc: 0n,
-      blnd_xlm: 0n,
       carry: 0n,
-      usdc: 0n,
+      first_loss: 0n,
+      second_loss: 0n,
+      third_loss: 0n,
     });
     expect(() =>
       decodeInterestReserveStateV3(
         xdr.ScVal.scvMap([
-          mapEntry('blnd_usdc', i128(-1n)),
-          mapEntry('blnd_xlm', i128(0n)),
           mapEntry('carry', i128(0n)),
-          mapEntry('usdc', i128(0n)),
+          mapEntry('first_loss', i128(-1n)),
+          mapEntry('second_loss', i128(0n)),
+          mapEntry('third_loss', i128(0n)),
         ])
       )
     ).toThrow('Invalid v3 interest-reserve state');

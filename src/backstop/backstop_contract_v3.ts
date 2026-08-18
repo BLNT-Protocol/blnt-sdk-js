@@ -9,11 +9,19 @@ import {
 import { Buffer } from 'buffer';
 import { i128, u64 } from '../index.js';
 
-/** The fixed Blend v3 backstop tiers, in loss-waterfall order. */
+/** Blend v3 loss-waterfall positions, in order. */
 export enum BackstopTierV3 {
+  FirstLoss = 'FirstLoss',
+  SecondLoss = 'SecondLoss',
+  ThirdLoss = 'ThirdLoss',
+}
+
+/** Canonical assets permitted in a Blend v3 backstop configuration. */
+export enum BackstopAssetV3 {
   BlndXlm = 'BlndXlm',
   BlndUsdc = 'BlndUsdc',
   Usdc = 'Usdc',
+  Xlm = 'Xlm',
 }
 
 export interface Q4WV3 {
@@ -27,35 +35,19 @@ export interface UserBalanceV3 {
 }
 
 export interface PoolTierDataV3 {
-  tokens: i128;
+  asset: BackstopAssetV3;
+  blnd_emission_eligible: boolean;
+  take_rate_weight: number;
+  token: string;
   shares: i128;
+  tokens: i128;
   value: i128;
 }
 
 export interface PoolBackstopDataV3 {
   active_value: i128;
-  blnd_usdc: PoolTierDataV3;
-  blnd_xlm: PoolTierDataV3;
   q4w_pct: i128;
-  usdc: PoolTierDataV3;
-}
-
-export interface DeployedPoolTierDataV3 {
-  active_blnd: i128;
-  active_value: i128;
-  assets: i128;
-  queued_shares: i128;
-  queued_value: i128;
-  shares: i128;
-  total_value: i128;
-}
-
-export interface DeployedPoolBackstopDataV3 {
-  blnd_usdc: DeployedPoolTierDataV3;
-  blnd_xlm: DeployedPoolTierDataV3;
-  q4w_percentage: i128;
-  usdc: DeployedPoolTierDataV3;
-  valuation_valid_until?: u64;
+  tiers: PoolTierDataV3[];
 }
 
 export interface BackstopConstructorArgsV3 {
@@ -99,6 +91,10 @@ function tierToScVal(tier: BackstopTierV3): xdr.ScVal {
   return xdr.ScVal.scvVec([xdr.ScVal.scvSymbol(tier)]);
 }
 
+function assetToScVal(asset: BackstopAssetV3): xdr.ScVal {
+  return xdr.ScVal.scvVec([xdr.ScVal.scvSymbol(asset)]);
+}
+
 function addressesToScVal(addresses: Array<Address | string>): xdr.ScVal {
   return xdr.ScVal.scvVec(addresses.map(addressToScVal));
 }
@@ -111,22 +107,24 @@ function parseNative<T>(result: string): T {
   return scValToNative(xdr.ScVal.fromXDR(result, 'base64')) as T;
 }
 
-/** Normalize the deployed and compact candidate pool-data layouts. */
-export function normalizePoolBackstopDataV3(
-  data: PoolBackstopDataV3 | DeployedPoolBackstopDataV3
-): PoolBackstopDataV3 {
-  if ('active_value' in data) return data;
-  const normalizeTier = (tier: DeployedPoolTierDataV3): PoolTierDataV3 => ({
-    tokens: tier.assets,
-    shares: tier.shares,
-    value: tier.total_value,
-  });
+export function parseBackstopAssetV3(value: unknown): BackstopAssetV3 {
+  const tag =
+    Array.isArray(value)
+      ? value[0]
+      : typeof value === 'object' && value !== null && 'tag' in value
+      ? (value as { tag: unknown }).tag
+      : value;
+  if (Object.values(BackstopAssetV3).includes(tag as BackstopAssetV3)) {
+    return tag as BackstopAssetV3;
+  }
+  throw new Error(`Unknown v3 backstop asset: ${String(tag)}`);
+}
+
+function parsePoolData(result: string): PoolBackstopDataV3 {
+  const data = parseNative<Omit<PoolBackstopDataV3, 'tiers'> & { tiers: Array<Omit<PoolTierDataV3, 'asset'> & { asset: unknown }> }>(result);
   return {
-    active_value: data.blnd_xlm.active_value + data.blnd_usdc.active_value + data.usdc.active_value,
-    blnd_xlm: normalizeTier(data.blnd_xlm),
-    blnd_usdc: normalizeTier(data.blnd_usdc),
-    q4w_pct: data.q4w_percentage,
-    usdc: normalizeTier(data.usdc),
+    ...data,
+    tiers: data.tiers.map((tier) => ({ ...tier, asset: parseBackstopAssetV3(tier.asset) })),
   };
 }
 
@@ -144,10 +142,7 @@ export class BackstopContractV3 extends Contract {
     dequeueWithdrawal: () => {},
     withdraw: (result: string): i128 => parseNative(result),
     userBalance: (result: string): UserBalanceV3 => parseNative(result),
-    poolData: (result: string): PoolBackstopDataV3 =>
-      normalizePoolBackstopDataV3(
-        parseNative<PoolBackstopDataV3 | DeployedPoolBackstopDataV3>(result)
-      ),
+    poolData: (result: string): PoolBackstopDataV3 => parsePoolData(result),
     backstopToken: (result: string): string => parseNative(result),
     drop: () => {},
     buyAndBurn: (result: string): i128 => parseNative(result),
@@ -251,16 +246,16 @@ export class BackstopContractV3 extends Contract {
     return this.call('pool_data', addressToScVal(pool)).toXDR('base64');
   }
 
-  backstopToken(tier: BackstopTierV3): string {
-    return this.call('backstop_token', tierToScVal(tier)).toXDR('base64');
+  backstopToken(tier: BackstopTierV3, pool: Address | string): string {
+    return this.call('backstop_token', tierToScVal(tier), addressToScVal(pool)).toXDR('base64');
   }
 
   drop(): string {
     return this.call('drop').toXDR('base64');
   }
 
-  buyAndBurn(): string {
-    return this.call('buy_and_burn').toXDR('base64');
+  buyAndBurn(asset: BackstopAssetV3): string {
+    return this.call('buy_and_burn', assetToScVal(asset)).toXDR('base64');
   }
 
   distribute(): string {

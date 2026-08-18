@@ -1,6 +1,7 @@
 import { Address, Contract, contract, Operation, scValToNative, xdr } from '@stellar/stellar-sdk';
 import { PoolInitMeta } from './index.js';
 import { i128 } from '../index.js';
+import { BackstopAssetV3, parseBackstopAssetV3 } from '../backstop/backstop_contract_v3.js';
 
 // @dev ENCODING REQUIRES PROPERTY NAMES TO MATCH RUST NAMES
 
@@ -21,6 +22,15 @@ export interface DeployV2Args {
   min_collateral: i128;
   backstop_take_rate: number;
   max_positions: number;
+}
+
+export interface BackstopTierConfigV3 {
+  asset: BackstopAssetV3;
+  take_rate_weight: number;
+}
+
+export interface DeployV3Args extends DeployV2Args {
+  backstop_config: BackstopTierConfigV3[];
 }
 
 export abstract class PoolFactoryContract extends Contract {
@@ -50,8 +60,8 @@ export abstract class PoolFactoryContract extends Contract {
    */
   isPool(pool_address: string): string {
     return this.call(
-      'deploy',
-      ...PoolFactoryContract.spec.funcArgsToScVals('deploy', { pool_address })
+      'is_pool',
+      ...PoolFactoryContract.spec.funcArgsToScVals('is_pool', { pool_address })
     ).toXDR('base64');
   }
 }
@@ -187,6 +197,68 @@ export class PoolFactoryContractV2 extends PoolFactoryContract {
     return this.call(
       'deploy',
       ...PoolFactoryContractV2.spec.funcArgsToScVals('deploy', contractArgs)
+    ).toXDR('base64');
+  }
+}
+
+export class PoolFactoryContractV3 extends PoolFactoryContractV2 {
+  constructor(address: string) {
+    super(address);
+  }
+
+  static readonly spec: contract.Spec = new contract.Spec([
+    ...PoolFactoryContract.spec.entries,
+    ...new contract.Spec([
+      // Function constructor
+      'AAAAAAAAAGhDb25zdHJ1Y3QgdGhlIHBvb2wgZmFjdG9yeSBjb250cmFjdAoKIyMjIEFyZ3VtZW50cwoqIGBwb29sX2luaXRfbWV0YWAgLSBUaGUgcG9vbCBpbml0aWFsaXphdGlvbiBtZXRhZGF0YQAAAA1fX2NvbnN0cnVjdG9yAAAAAAAAAQAAAAAAAAAOcG9vbF9pbml0X21ldGEAAAAAB9AAAAAMUG9vbEluaXRNZXRhAAAAAA==',
+      // Function deploy
+      'AAAAAAAAAAAAAAAGZGVwbG95AAAAAAAIAAAAAAAAAAVhZG1pbgAAAAAAABMAAAAAAAAABG5hbWUAAAAQAAAAAAAAAARzYWx0AAAD7gAAACAAAAAAAAAABm9yYWNsZQAAAAAAEwAAAAAAAAASYmFja3N0b3BfdGFrZV9yYXRlAAAAAAAEAAAAAAAAAA1tYXhfcG9zaXRpb25zAAAAAAAABAAAAAAAAAAObWluX2NvbGxhdGVyYWwAAAAAAAsAAAAAAAAAD2JhY2tzdG9wX2NvbmZpZwAAAAPqAAAH0AAAABJCYWNrc3RvcFRpZXJDb25maWcAAAAAAAEAAAAT',
+      // Function backstop_config
+      'AAAAAAAAAAAAAAAPYmFja3N0b3BfY29uZmlnAAAAAAEAAAAAAAAADHBvb2xfYWRkcmVzcwAAABMAAAABAAAD6gAAB9AAAAASQmFja3N0b3BUaWVyQ29uZmlnAAA=',
+      // Enum BackstopAsset
+      'AAAAAgAAAD1PbmUgb2YgdGhlIGZvdXIgY2Fub25pY2FsIGFzc2V0cyBhY2NlcHRlZCBieSB0aGUgdjMgYmFja3N0b3AuAAAAAAAAAAAAAA1CYWNrc3RvcEFzc2V0AAAAAAAABAAAAAAAAAAAAAAAB0JsbmRYbG0AAAAAAAAAAAAAAAAIQmxuZFVzZGMAAAAAAAAAAAAAAARVc2RjAAAAAAAAAAAAAAADWGxtAA==',
+      // Struct BackstopTierConfig
+      'AAAAAQAAADxPbmUgaW1tdXRhYmxlIGxvc3Mtd2F0ZXJmYWxsIHBvc2l0aW9uIGNvbmZpZ3VyZWQgZm9yIGEgcG9vbC4AAAAAAAAAEkJhY2tzdG9wVGllckNvbmZpZwAAAAAAAgAAADdDYW5vbmljYWwgYXNzZXQgZGVwb3NpdGVkIGludG8gdGhpcyB3YXRlcmZhbGwgcG9zaXRpb24uAAAAAAVhc3NldAAAAAAAB9AAAAANQmFja3N0b3BBc3NldAAAAAAAACVSZWxhdGl2ZSB0YWtlLXJhdGUgYWxsb2NhdGlvbiB3ZWlnaHQuAAAAAAAAEHRha2VfcmF0ZV93ZWlnaHQAAAAE',
+    ]).entries,
+  ]);
+
+  static readonly parsers = {
+    ...PoolFactoryContract.parsers,
+    backstopConfig: (result: string): BackstopTierConfigV3[] =>
+      (
+        PoolFactoryContractV3.spec.funcResToNative('backstop_config', result) as Array<{
+          asset: unknown;
+          take_rate_weight: number;
+        }>
+      ).map((config) => ({
+        asset: parseBackstopAssetV3(config.asset),
+        take_rate_weight: config.take_rate_weight,
+      })),
+    constructor: (result: string): string => scValToNative(xdr.ScVal.fromXDR(result, 'base64')),
+    deployPool: (result: string): string =>
+      PoolFactoryContractV3.spec.funcResToNative('deploy', result),
+  };
+
+  /** Fetch one pool's immutable loss-waterfall configuration. */
+  backstopConfig(pool_address: string): string {
+    return this.call(
+      'backstop_config',
+      ...PoolFactoryContractV3.spec.funcArgsToScVals('backstop_config', { pool_address })
+    ).toXDR('base64');
+  }
+
+  /** Deploy a pool with one to three ordered backstop tiers. */
+  deployPool(contractArgs: DeployV3Args): string {
+    const encodedArgs = {
+      ...contractArgs,
+      backstop_config: contractArgs.backstop_config.map((config) => ({
+        asset: { tag: config.asset, values: undefined },
+        take_rate_weight: config.take_rate_weight,
+      })),
+    };
+    return this.call(
+      'deploy',
+      ...PoolFactoryContractV3.spec.funcArgsToScVals('deploy', encodedArgs)
     ).toXDR('base64');
   }
 }
