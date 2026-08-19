@@ -69,3 +69,30 @@ test('v3 reserve emissions accept internal carry fields without weakening v2 par
     lastTime: 2,
   });
 });
+
+test('v3 user emissions accept internal carry without weakening v2 parsing', () => {
+  const mapEntry = (key: string, value: xdr.ScVal) =>
+    new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol(key), val: value });
+  const ledgerEntry = xdr.LedgerEntryData.contractData(
+    new xdr.ContractDataEntry({
+      contract: Address.fromString(
+        'CC6W2UPMNMBTFTIUECXVYUBUF7HZ5C3R3U6XCOHGF5JO4M5OJAS4YKPU'
+      ).toScAddress(),
+      key: xdr.ScVal.scvSymbol('UserEmis'),
+      durability: xdr.ContractDataDurability.persistent(),
+      val: xdr.ScVal.scvMap([
+        mapEntry('accrued', nativeToScVal(7n, { type: 'i128' })),
+        mapEntry('carry', nativeToScVal(1n, { type: 'i128' })),
+        mapEntry('index', nativeToScVal(3n, { type: 'i128' })),
+      ]),
+    })
+  );
+
+  expect(() => UserEmissions.fromLedgerEntryData(ledgerEntry)).toThrow(
+    'UserEmissions invalid key: should not contain carry'
+  );
+  expect(UserEmissions.fromLedgerEntryData(ledgerEntry, true)).toMatchObject({
+    accrued: 7n,
+    index: 3n,
+  });
+});

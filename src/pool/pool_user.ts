@@ -1,5 +1,5 @@
 import { rpc, xdr } from '@stellar/stellar-sdk';
-import { Network, Reserve } from '../index.js';
+import { Network, Reserve, Version } from '../index.js';
 import { decodeEntryKey } from '../ledger_entry_helper.js';
 import { PoolUserEmissionData, Positions } from './user_types.js';
 import { Pool } from './pool.js';
@@ -42,7 +42,10 @@ export class PoolUser {
         case `UserEmis`: {
           const reserve_emis_id =
             PoolUserEmissionData.getEmissionIndexFromLedgerEntryData(ledgerEntry);
-          const reserve_data = PoolUserEmissionData.fromLedgerEntryData(ledgerEntry);
+          const reserve_data = PoolUserEmissionData.fromLedgerEntryData(
+            ledgerEntry,
+            pool.version === Version.V3
+          );
           emissions.set(reserve_emis_id, reserve_data);
           break;
         }

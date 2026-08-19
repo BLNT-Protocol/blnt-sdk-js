@@ -352,19 +352,25 @@ export class EmissionDataV3 extends EmissionDataV2 {
 export class UserEmissions {
   constructor(public index: bigint, public accrued: bigint) {}
 
-  static fromLedgerEntryData(ledger_entry_data: xdr.LedgerEntryData | string): UserEmissions {
+  static fromLedgerEntryData(
+    ledger_entry_data: xdr.LedgerEntryData | string,
+    allowV3CarryFields: boolean = false
+  ): UserEmissions {
     if (typeof ledger_entry_data == 'string') {
       ledger_entry_data = xdr.LedgerEntryData.fromXDR(ledger_entry_data, 'base64');
     }
 
     const scval = ledger_entry_data.contractData().val();
 
-    const userEmissions = UserEmissions.fromScVal(scval);
+    const userEmissions = UserEmissions.fromScVal(scval, allowV3CarryFields);
 
     return userEmissions;
   }
 
-  static fromScVal(sc_val: xdr.ScVal | string): UserEmissions | undefined {
+  static fromScVal(
+    sc_val: xdr.ScVal | string,
+    allowV3CarryFields: boolean = false
+  ): UserEmissions | undefined {
     if (typeof sc_val == 'string') {
       sc_val = xdr.ScVal.fromXDR(sc_val, 'base64');
     }
@@ -385,6 +391,11 @@ export class UserEmissions {
         case 'index':
           index = scValToNative(map_entry.val());
           break;
+        case 'carry':
+          if (allowV3CarryFields) {
+            break;
+          }
+          throw Error(`UserEmissions invalid key: should not contain ${key}`);
         default:
           throw Error(`UserEmissions invalid key: should not contain ${key}`);
       }
