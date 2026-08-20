@@ -30,6 +30,7 @@ export enum PoolEventType {
   DefaultedDebt = 'defaulted_debt',
   DeleteAuction = 'delete_auction',
   FlashLoan = 'flash_loan',
+  Clawback = 'clawback',
 }
 export interface BasePoolEvent extends BaseBlendEvent {
   contractType: BlendContractType.Pool;
@@ -237,6 +238,15 @@ export interface PoolFlashLoanEvent extends BasePoolEvent {
   dTokensMinted: bigint;
 }
 
+export interface PoolClawbackEvent extends BasePoolEvent {
+  eventType: PoolEventType.Clawback;
+  asset: string;
+  from: string;
+  amount: bigint;
+  supplyBurned: bigint;
+  collateralBurned: bigint;
+}
+
 export type BasePoolEvents =
   | PoolSetAdminEvent
   | PoolCancelSetReserveEvent
@@ -274,8 +284,7 @@ export type PoolV2Event =
   | PoolDefaultedDebtEvent
   | PoolFlashLoanEvent;
 
-/** V3 preserves the v2 pool event schema. */
-export type PoolV3Event = PoolV2Event;
+export type PoolV3Event = PoolV2Event | PoolClawbackEvent;
 
 /**
  * Create a PoolV1Event from a RawEventResponse.
@@ -661,11 +670,48 @@ export function poolEventV2FromEventResponse(
   }
 }
 
-/** Parse a v3 pool event using its intentionally v2-compatible schema. */
+/** Parse a v3 pool event, including v3-only reserve clawbacks. */
 export function poolEventV3FromEventResponse(
   eventResponse: rpc.Api.RawEventResponse
 ): PoolV3Event | undefined {
-  return poolEventV2FromEventResponse(eventResponse);
+  const inheritedEvent = poolEventV2FromEventResponse(eventResponse);
+  if (inheritedEvent !== undefined) {
+    return inheritedEvent;
+  }
+  if (
+    eventResponse.type !== 'contract' ||
+    eventResponse.topic.length !== 3 ||
+    eventResponse.contractId === undefined
+  ) {
+    return undefined;
+  }
+
+  try {
+    const topic = eventResponse.topic.map((value) => xdr.ScVal.fromXDR(value, 'base64'));
+    if (scValToNative(topic[0]) !== PoolEventType.Clawback) {
+      return undefined;
+    }
+    const data = xdr.ScVal.fromXDR(eventResponse.value, 'base64').vec();
+    if (data?.length !== 3) {
+      return undefined;
+    }
+    return {
+      id: eventResponse.id,
+      contractId: eventResponse.contractId,
+      contractType: BlendContractType.Pool,
+      ledger: eventResponse.ledger,
+      ledgerClosedAt: eventResponse.ledgerClosedAt,
+      txHash: eventResponse.txHash,
+      eventType: PoolEventType.Clawback,
+      asset: Address.fromScVal(topic[1]).toString(),
+      from: Address.fromScVal(topic[2]).toString(),
+      amount: BigInt(scValToNative(data[0])),
+      supplyBurned: BigInt(scValToNative(data[1])),
+      collateralBurned: BigInt(scValToNative(data[2])),
+    };
+  } catch (_error) {
+    return undefined;
+  }
 }
 
 /**

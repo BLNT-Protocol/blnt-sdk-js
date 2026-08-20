@@ -4,6 +4,7 @@ import {
   PoolEventType,
   poolEventV1FromEventResponse,
   poolEventV2FromEventResponse,
+  poolEventV3FromEventResponse,
   PoolSetAdminEvent,
   PoolCancelSetReserveEvent,
   PoolSetReserveEvent,
@@ -29,6 +30,7 @@ import {
   PoolFillAuctionV2Event,
   PoolDeleteAuctionEvent,
   PoolFlashLoanEvent,
+  PoolClawbackEvent,
   AuctionData,
   PoolQueueSetReserveV1Event,
   PoolUpdatePoolV1Event,
@@ -960,6 +962,38 @@ describe('Pool Event Parsing', () => {
       expect(parsedV2Event.dTokensMinted.toString()).toEqual('1010');
 
       expect(parsedV1Event).toBeUndefined();
+    });
+
+    it('should parse clawback only as a V3 event', () => {
+      const assetAddress = Keypair.random().publicKey();
+      const fromAddress = Keypair.random().publicKey();
+      const event: Api.RawEventResponse = {
+        contractId: poolId,
+        topic: [
+          nativeToScVal('clawback', { type: 'symbol' }).toXDR('base64'),
+          nativeToScVal(assetAddress, { type: 'address' }).toXDR('base64'),
+          nativeToScVal(fromAddress, { type: 'address' }).toXDR('base64'),
+        ],
+        value: nativeToScVal([1000n, 600n, 400n], { type: 'i128' }).toXDR('base64'),
+        id: '1',
+        transactionIndex: 1,
+        operationIndex: 0,
+        type: 'contract',
+        ledger: 123,
+        ledgerClosedAt: '2025-04-08T12:34:56Z',
+        inSuccessfulContractCall: true,
+        txHash: 'txhash123',
+      };
+
+      const parsedV3Event = poolEventV3FromEventResponse(event) as PoolClawbackEvent;
+
+      expect(poolEventV2FromEventResponse(event)).toBeUndefined();
+      expect(parsedV3Event.eventType).toEqual(PoolEventType.Clawback);
+      expect(parsedV3Event.asset).toEqual(assetAddress);
+      expect(parsedV3Event.from).toEqual(fromAddress);
+      expect(parsedV3Event.amount).toEqual(1000n);
+      expect(parsedV3Event.supplyBurned).toEqual(600n);
+      expect(parsedV3Event.collateralBurned).toEqual(400n);
     });
   });
 });

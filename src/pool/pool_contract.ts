@@ -83,6 +83,12 @@ export interface FlashLoanArgs {
   requests: Array<Request>;
 }
 
+export interface PoolClawbackArgs {
+  asset: Address | string;
+  from: Address | string;
+  amount: i128;
+}
+
 export abstract class PoolContract extends Contract {
   // @dev: Generated from soroban-cli Typescript bindings
   static spec: contract.Spec = new contract.Spec([
@@ -843,5 +849,30 @@ export class PoolContractV2 extends PoolContract {
   }
 }
 
-/** V3 pool adapter. All public operations retain the v2 ABI. */
-export class PoolContractV3 extends PoolContractV2 {}
+/** V3 pool adapter. */
+export class PoolContractV3 extends PoolContractV2 {
+  static readonly spec = new contract.Spec([
+    ...PoolContractV2.spec.entries,
+    ...new contract.Spec([
+      // Function clawback
+      'AAAAAAAAAAAAAAAIY2xhd2JhY2sAAAADAAAAAAAAAAVhc3NldAAAAAAAABMAAAAAAAAABGZyb20AAAATAAAAAAAAAAZhbW91bnQAAAAAAAsAAAAA',
+    ]).entries,
+  ]);
+
+  static readonly parsers = {
+    ...PoolContractV2.parsers,
+    clawback: () => {},
+  };
+
+  /**
+   * Claws back an exact amount from a user's supplied reserve. The reserve's
+   * Stellar Asset Contract requires its administrator's authorization and a
+   * clawbackable balance for this pool.
+   */
+  clawback(contractArgs: PoolClawbackArgs): string {
+    return this.call(
+      'clawback',
+      ...PoolContractV3.spec.funcArgsToScVals('clawback', contractArgs)
+    ).toXDR('base64');
+  }
+}
