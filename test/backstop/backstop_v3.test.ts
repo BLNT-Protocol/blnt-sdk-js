@@ -67,6 +67,21 @@ describe('Blend v3 SDK adapters', () => {
     expect(scValToNative(deposit.args()[2])).toEqual(poolId);
     expect(scValToNative(deposit.args()[3])).toEqual(25n);
 
+    const clawback = invocation(
+      contract.clawback({
+        tier: BackstopTierV3.ThirdLoss,
+        from: userId,
+        pool_address: poolId,
+        amount: 20n,
+      })
+    );
+    expect(clawback.functionName().toString()).toEqual('clawback');
+    expect(clawback.args()).toHaveLength(4);
+    expect(clawback.args()[0].vec()?.[0].sym().toString()).toEqual('ThirdLoss');
+    expect(scValToNative(clawback.args()[1])).toEqual(poolId);
+    expect(scValToNative(clawback.args()[2])).toEqual(userId);
+    expect(scValToNative(clawback.args()[3])).toEqual(20n);
+
     const claim = invocation(
       contract.claim({
         tier: BackstopTierV3.SecondLoss,
