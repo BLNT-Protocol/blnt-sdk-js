@@ -30,4 +30,12 @@ describe('PoolContractV3', () => {
     expect(scValToNative(clawback.args()[1])).toEqual(userId);
     expect(scValToNative(clawback.args()[2])).toEqual(25n);
   });
+
+  test('encodes reserve-loss reconciliation with the v3 ABI', () => {
+    const reconcileLoss = invocation(new PoolContractV3(poolId).reconcileLoss(assetId));
+
+    expect(reconcileLoss.functionName().toString()).toEqual('reconcile_loss');
+    expect(reconcileLoss.args()).toHaveLength(1);
+    expect(scValToNative(reconcileLoss.args()[0])).toEqual(assetId);
+  });
 });

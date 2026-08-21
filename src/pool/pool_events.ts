@@ -31,6 +31,7 @@ export enum PoolEventType {
   DeleteAuction = 'delete_auction',
   FlashLoan = 'flash_loan',
   Clawback = 'clawback',
+  ReconcileLoss = 'reconcile_loss',
 }
 export interface BasePoolEvent extends BaseBlendEvent {
   contractType: BlendContractType.Pool;
@@ -247,6 +248,15 @@ export interface PoolClawbackEvent extends BasePoolEvent {
   collateralBurned: bigint;
 }
 
+export interface PoolReconcileLossEvent extends BasePoolEvent {
+  eventType: PoolEventType.ReconcileLoss;
+  asset: string;
+  loss: bigint;
+  supplierLoss: bigint;
+  backstopCreditLoss: bigint;
+  bRateLoss: bigint;
+}
+
 export type BasePoolEvents =
   | PoolSetAdminEvent
   | PoolCancelSetReserveEvent
@@ -284,7 +294,7 @@ export type PoolV2Event =
   | PoolDefaultedDebtEvent
   | PoolFlashLoanEvent;
 
-export type PoolV3Event = PoolV2Event | PoolClawbackEvent;
+export type PoolV3Event = PoolV2Event | PoolClawbackEvent | PoolReconcileLossEvent;
 
 /**
  * Create a PoolV1Event from a RawEventResponse.
@@ -670,7 +680,7 @@ export function poolEventV2FromEventResponse(
   }
 }
 
-/** Parse a v3 pool event, including v3-only reserve clawbacks. */
+/** Parse v3-only reserve clawback and reserve-loss events. */
 export function poolEventV3FromEventResponse(
   eventResponse: rpc.Api.RawEventResponse
 ): PoolV3Event | undefined {
@@ -680,7 +690,7 @@ export function poolEventV3FromEventResponse(
   }
   if (
     eventResponse.type !== 'contract' ||
-    eventResponse.topic.length !== 3 ||
+    eventResponse.topic.length === 0 ||
     eventResponse.contractId === undefined
   ) {
     return undefined;
@@ -688,27 +698,45 @@ export function poolEventV3FromEventResponse(
 
   try {
     const topic = eventResponse.topic.map((value) => xdr.ScVal.fromXDR(value, 'base64'));
-    if (scValToNative(topic[0]) !== PoolEventType.Clawback) {
-      return undefined;
-    }
+    const eventType = scValToNative(topic[0]);
     const data = xdr.ScVal.fromXDR(eventResponse.value, 'base64').vec();
-    if (data?.length !== 3) {
-      return undefined;
-    }
-    return {
+    const baseEvent = {
       id: eventResponse.id,
       contractId: eventResponse.contractId,
-      contractType: BlendContractType.Pool,
+      contractType: BlendContractType.Pool as const,
       ledger: eventResponse.ledger,
       ledgerClosedAt: eventResponse.ledgerClosedAt,
       txHash: eventResponse.txHash,
-      eventType: PoolEventType.Clawback,
-      asset: Address.fromScVal(topic[1]).toString(),
-      from: Address.fromScVal(topic[2]).toString(),
-      amount: BigInt(scValToNative(data[0])),
-      supplyBurned: BigInt(scValToNative(data[1])),
-      collateralBurned: BigInt(scValToNative(data[2])),
     };
+    if (eventType === PoolEventType.Clawback) {
+      if (topic.length !== 3 || data?.length !== 3) {
+        return undefined;
+      }
+      return {
+        ...baseEvent,
+        eventType: PoolEventType.Clawback,
+        asset: Address.fromScVal(topic[1]).toString(),
+        from: Address.fromScVal(topic[2]).toString(),
+        amount: BigInt(scValToNative(data[0])),
+        supplyBurned: BigInt(scValToNative(data[1])),
+        collateralBurned: BigInt(scValToNative(data[2])),
+      };
+    }
+    if (eventType === PoolEventType.ReconcileLoss) {
+      if (topic.length !== 2 || data?.length !== 4) {
+        return undefined;
+      }
+      return {
+        ...baseEvent,
+        eventType: PoolEventType.ReconcileLoss,
+        asset: Address.fromScVal(topic[1]).toString(),
+        loss: BigInt(scValToNative(data[0])),
+        supplierLoss: BigInt(scValToNative(data[1])),
+        backstopCreditLoss: BigInt(scValToNative(data[2])),
+        bRateLoss: BigInt(scValToNative(data[3])),
+      };
+    }
+    return undefined;
   } catch (_error) {
     return undefined;
   }

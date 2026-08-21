@@ -31,6 +31,7 @@ import {
   PoolDeleteAuctionEvent,
   PoolFlashLoanEvent,
   PoolClawbackEvent,
+  PoolReconcileLossEvent,
   AuctionData,
   PoolQueueSetReserveV1Event,
   PoolUpdatePoolV1Event,
@@ -994,6 +995,36 @@ describe('Pool Event Parsing', () => {
       expect(parsedV3Event.amount).toEqual(1000n);
       expect(parsedV3Event.supplyBurned).toEqual(600n);
       expect(parsedV3Event.collateralBurned).toEqual(400n);
+    });
+
+    it('parses reconcile_loss with the V3 parser but not the V2 parser', () => {
+      const assetAddress = Keypair.random().publicKey();
+      const event: Api.RawEventResponse = {
+        contractId: poolId,
+        topic: [
+          nativeToScVal('reconcile_loss', { type: 'symbol' }).toXDR('base64'),
+          nativeToScVal(assetAddress, { type: 'address' }).toXDR('base64'),
+        ],
+        value: nativeToScVal([1000n, 800n, 200n, 25n], { type: 'i128' }).toXDR('base64'),
+        id: '1',
+        transactionIndex: 1,
+        operationIndex: 0,
+        type: 'contract',
+        ledger: 123,
+        ledgerClosedAt: '2025-04-08T12:34:56Z',
+        inSuccessfulContractCall: true,
+        txHash: 'txhash123',
+      };
+
+      const parsedV3Event = poolEventV3FromEventResponse(event) as PoolReconcileLossEvent;
+
+      expect(poolEventV2FromEventResponse(event)).toBeUndefined();
+      expect(parsedV3Event.eventType).toEqual(PoolEventType.ReconcileLoss);
+      expect(parsedV3Event.asset).toEqual(assetAddress);
+      expect(parsedV3Event.loss).toEqual(1000n);
+      expect(parsedV3Event.supplierLoss).toEqual(800n);
+      expect(parsedV3Event.backstopCreditLoss).toEqual(200n);
+      expect(parsedV3Event.bRateLoss).toEqual(25n);
     });
   });
 });

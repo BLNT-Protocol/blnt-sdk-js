@@ -856,12 +856,16 @@ export class PoolContractV3 extends PoolContractV2 {
     ...new contract.Spec([
       // Function clawback
       'AAAAAAAAAAAAAAAIY2xhd2JhY2sAAAADAAAAAAAAAAVhc3NldAAAAAAAABMAAAAAAAAABGZyb20AAAATAAAAAAAAAAZhbW91bnQAAAAAAAsAAAAA',
+      // Function reconcile_loss
+      'AAAAAAAAAAAAAAAOcmVjb25jaWxlX2xvc3MAAAAAAAEAAAAAAAAABWFzc2V0AAAAAAAAEwAAAAEAAAAL',
     ]).entries,
   ]);
 
   static readonly parsers = {
     ...PoolContractV2.parsers,
     clawback: () => {},
+    reconcileLoss: (result: string): i128 =>
+      PoolContractV3.spec.funcResToNative('reconcile_loss', result),
   };
 
   /**
@@ -873,6 +877,18 @@ export class PoolContractV3 extends PoolContractV2 {
     return this.call(
       'clawback',
       ...PoolContractV3.spec.funcArgsToScVals('clawback', contractArgs)
+    ).toXDR('base64');
+  }
+
+  /**
+   * Recognizes a direct reserve-custody deficit against suppliers and then
+   * unpaid take-rate credit without changing borrower liabilities or creating
+   * backstop debt.
+   */
+  reconcileLoss(asset: Address | string): string {
+    return this.call(
+      'reconcile_loss',
+      ...PoolContractV3.spec.funcArgsToScVals('reconcile_loss', { asset })
     ).toXDR('base64');
   }
 }
