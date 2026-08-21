@@ -138,7 +138,6 @@ function parsePoolData(result: string): PoolBackstopDataV3 {
 export class BackstopContractV3 extends Contract {
   static readonly parsers = {
     deposit: (result: string): i128 => parseNative(result),
-    clawback: () => {},
     queueWithdrawal: (result: string): Q4WV3 => parseNative(result),
     dequeueWithdrawal: () => {},
     withdraw: (result: string): i128 => parseNative(result),
@@ -199,17 +198,6 @@ export class BackstopContractV3 extends Contract {
       tierToScVal(args.tier),
       addressToScVal(args.from),
       addressToScVal(args.pool_address),
-      i128ToScVal(args.amount)
-    ).toXDR('base64');
-  }
-
-  /** Build an issuer-authorized clawback of one user's tier position. */
-  clawback(args: TierBackstopActionArgsV3): string {
-    return this.call(
-      'clawback',
-      tierToScVal(args.tier),
-      addressToScVal(args.pool_address),
-      addressToScVal(args.from),
       i128ToScVal(args.amount)
     ).toXDR('base64');
   }
