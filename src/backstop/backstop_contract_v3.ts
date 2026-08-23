@@ -41,10 +41,12 @@ export interface PoolTierDataV3 {
   token: string;
   shares: i128;
   tokens: i128;
+  /** Transferable USDC-equivalent value; zero while plain USDC is deauthorized. */
   value: i128;
 }
 
 export interface PoolBackstopDataV3 {
+  /** Aggregate transferable value excluding queued withdrawals. */
   active_value: i128;
   q4w_pct: i128;
   tiers: PoolTierDataV3[];

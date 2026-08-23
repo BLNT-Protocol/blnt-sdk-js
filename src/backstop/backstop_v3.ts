@@ -44,7 +44,7 @@ export class BackstopTierPoolV3 {
   }
 }
 
-/** Immutable tier accounting and valuation for one v3 pool. */
+/** Immutable tier accounting and authorization-aware transferable valuation for one v3 pool. */
 export class BackstopPoolV3 {
   public readonly tiers: BackstopTierMapV3<BackstopTierPoolV3>;
   public readonly configuredTiers: BackstopTierV3[];
