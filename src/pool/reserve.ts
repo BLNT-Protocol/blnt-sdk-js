@@ -25,6 +25,12 @@ import {
  * Manage ledger data for a reserve in a Blend pool
  */
 export abstract class Reserve {
+  /**
+   * Whether the reserve's Stellar Asset Contract currently authorizes the
+   * pool. Undefined means the token is not a SAC or the status was unavailable.
+   */
+  public poolAuthorized: boolean | undefined;
+
   constructor(
     /**
      * The contract address of the Pool the reserve belongs to
@@ -88,6 +94,11 @@ export abstract class Reserve {
    * The version of the reserve
    */
   abstract readonly version: Version;
+
+  /** True only when the reserve is known to be deauthorized for its pool. */
+  public get isPoolDeauthorized(): boolean {
+    return this.poolAuthorized === false;
+  }
 
   /********** Data Helpers **********/
 

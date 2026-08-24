@@ -144,6 +144,32 @@ describe('Blend v3 SDK adapters', () => {
     expect(pool.totalValue()).toEqual(9_000n);
   });
 
+  test('derives funded plain-USDC deauthorization from transferable value', () => {
+    const pool = new BackstopPoolV3(
+      {
+        active_value: 0n,
+        q4w_pct: 0n,
+        tiers: [
+          {
+            ...tierData(0n, 100n, 100n),
+            asset: BackstopAssetV3.Usdc,
+            blnd_emission_eligible: false,
+          },
+        ],
+      },
+      123
+    );
+
+    expect(pool.tier(BackstopTierV3.FirstLoss).isDeauthorized).toBe(true);
+
+    pool.tier(BackstopTierV3.FirstLoss).data.value = 100n;
+    expect(pool.tier(BackstopTierV3.FirstLoss).isDeauthorized).toBe(false);
+
+    pool.tier(BackstopTierV3.FirstLoss).data.tokens = 0n;
+    pool.tier(BackstopTierV3.FirstLoss).data.value = 0n;
+    expect(pool.tier(BackstopTierV3.FirstLoss).isDeauthorized).toBe(false);
+  });
+
   test('rejects pool data outside the one-to-three tier bound', () => {
     expect(
       () =>

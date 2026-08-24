@@ -1,6 +1,7 @@
 import { Network } from '../index.js';
 import { simulateAndParse } from '../simulation_helper.js';
 import {
+  BackstopAssetV3,
   BackstopContractV3,
   BackstopTierV3,
   PoolBackstopDataV3,
@@ -28,6 +29,13 @@ export function configuredBackstopTiersV3(count: number): BackstopTierV3[] {
 /** One independently accounted v3 backstop tier for a pool. */
 export class BackstopTierPoolV3 {
   constructor(public tier: BackstopTierV3, public data: PoolTierDataV3) {}
+
+  /** A funded plain-USDC tier whose shared backstop balance is deauthorized. */
+  public get isDeauthorized(): boolean {
+    return (
+      this.data.asset === BackstopAssetV3.Usdc && this.data.tokens > 0n && this.data.value === 0n
+    );
+  }
 
   public sharesToTokens(shares: bigint): bigint {
     if (this.data.shares === 0n) {

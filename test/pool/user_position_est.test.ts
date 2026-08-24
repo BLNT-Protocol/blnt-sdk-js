@@ -151,4 +151,22 @@ describe('user position estimation', () => {
     expect(estimate.supplyApy).toBeCloseTo(0);
     expect(estimate.borrowApy).toBeCloseTo((10 * 200 * 1.15 * 0.15) / estimate.totalBorrowed);
   });
+
+  it('keeps deauthorized collateral nominal but gives it zero borrowing value', () => {
+    reserve_0.poolAuthorized = false;
+    const user_positions = new Positions(
+      new Map([[2, toFixed(10, 7)]]),
+      new Map([[0, toFixed(4_000, 7)]]),
+      new Map()
+    );
+
+    const estimate = PositionsEstimate.build(pool, pool_oracle, user_positions);
+
+    expect(estimate.totalSupplied).toBeCloseTo(4000 * 1 * 1.25);
+    expect(estimate.totalEffectiveCollateral).toBe(0);
+    expect(estimate.totalEffectiveLiabilities).toBeCloseTo((10 * 200 * 1.15) / 0.85);
+    expect(estimate.borrowCap).toBeCloseTo(-estimate.totalEffectiveLiabilities);
+    expect(estimate.borrowLimit).toBe(0);
+    reserve_0.poolAuthorized = undefined;
+  });
 });

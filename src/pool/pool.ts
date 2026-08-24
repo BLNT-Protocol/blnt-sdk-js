@@ -1,4 +1,6 @@
+import { Address } from '@stellar/stellar-sdk';
 import { Network, Version } from '../index.js';
+import { getTokenAuthorizations } from '../token.js';
 import { PoolOracle } from './pool_oracle.js';
 import { PoolUser } from './pool_user.js';
 import { PoolMetadata } from './pool_metadata.js';
@@ -153,7 +155,19 @@ export class PoolV3 extends PoolV2 {
       Version.V3
     );
     const reserves = new Map<string, Reserve>();
+    let authorizations = new Map<string, boolean | undefined>();
+    try {
+      authorizations = await getTokenAuthorizations(
+        network,
+        reserveList.map((reserve) => reserve.assetId),
+        Address.fromString(id)
+      );
+    } catch {
+      // Authorization is advisory SDK state. The pool contract still enforces
+      // authorization atomically if the batched read is unavailable.
+    }
     for (const reserve of reserveList) {
+      reserve.poolAuthorized = authorizations.get(reserve.assetId);
       reserves.set(reserve.assetId, reserve);
     }
 

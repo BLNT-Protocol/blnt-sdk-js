@@ -113,6 +113,7 @@ export enum ContractErrorType {
   ExceededSupplyCap = 1220,
   ReserveDisabled = 1223,
   MinCollateralNotMet = 1224,
+  ReserveDeauthorized = 1230,
 
   // Oracle Errors
   StalePrice = 1210,

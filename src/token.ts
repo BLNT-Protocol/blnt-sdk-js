@@ -176,3 +176,100 @@ export async function getTokenBalance(
     throw Error(`unable to fetch balance for token: ${token_id}`);
   }
 }
+
+/**
+ * Fetch whether a Stellar Asset Contract authorizes an address to use its
+ * balance. Returns undefined when the token does not expose the SAC-only
+ * `authorized` extension or when the status cannot be read.
+ */
+export async function getTokenAuthorized(
+  network: Network,
+  tokenId: string,
+  address: Address
+): Promise<boolean | undefined> {
+  const account = new Account('GANXGJV2RNOFMOSQ2DTI3RKDBAVERXUVFC27KW3RLVQCLB3RYNO3AAI4', '123');
+  const txBuilder = new TransactionBuilder(account, {
+    fee: '1000',
+    timebounds: { minTime: 0, maxTime: 0 },
+    networkPassphrase: network.passphrase,
+  });
+  txBuilder.addOperation(new Contract(tokenId).call('authorized', address.toScVal()));
+  const stellarRpc = new rpc.Server(network.rpc, network.opts);
+  const response = await stellarRpc.simulateTransaction(txBuilder.build());
+  if (rpc.Api.isSimulationSuccess(response)) {
+    return Boolean(scValToNative(response.result.retval));
+  }
+  return undefined;
+}
+
+function tokenBalanceLedgerKey(tokenId: string, address: Address): xdr.LedgerKey {
+  return xdr.LedgerKey.contractData(
+    new xdr.LedgerKeyContractData({
+      contract: Address.fromString(tokenId).toScAddress(),
+      key: xdr.ScVal.scvVec([xdr.ScVal.scvSymbol('Balance'), address.toScVal()]),
+      durability: xdr.ContractDataDurability.persistent(),
+    })
+  );
+}
+
+function balanceAuthorized(value: xdr.ScVal): boolean | undefined {
+  const authorized = value
+    .map()
+    ?.find((entry) => decodeEntryKey(entry.key()) === 'authorized');
+  return authorized === undefined ? undefined : Boolean(scValToNative(authorized.val()));
+}
+
+/**
+ * Batch-read pool authorization for a list of token contracts. Non-SAC tokens
+ * map to undefined. A SAC without a balance entry falls back to its contract
+ * method because its default depends on the issuer's AUTH_REQUIRED flag.
+ */
+export async function getTokenAuthorizations(
+  network: Network,
+  tokenIds: string[],
+  address: Address
+): Promise<Map<string, boolean | undefined>> {
+  const authorizations = new Map<string, boolean | undefined>();
+  if (tokenIds.length === 0) {
+    return authorizations;
+  }
+
+  const keys = tokenIds.flatMap((tokenId) => [
+    TokenMetadata.ledgerKey(tokenId),
+    tokenBalanceLedgerKey(tokenId, address),
+  ]);
+  const stellarRpc = new rpc.Server(network.rpc, network.opts);
+  const response = await stellarRpc.getLedgerEntries(...keys);
+  const stellarAssets = new Set<string>();
+
+  for (const entry of response.entries) {
+    const contractData = entry.val.contractData();
+    const tokenId = Address.fromScAddress(contractData.contract()).toString();
+    const key = decodeEntryKey(contractData.key());
+    if (key === 'ContractInstance') {
+      if (
+        contractData.val().instance().executable().switch() ===
+        xdr.ContractExecutableType.contractExecutableStellarAsset()
+      ) {
+        stellarAssets.add(tokenId);
+      }
+    } else if (key === 'Balance') {
+      authorizations.set(tokenId, balanceAuthorized(contractData.val()));
+    }
+  }
+
+  await Promise.all(
+    tokenIds.map(async (tokenId) => {
+      if (!stellarAssets.has(tokenId)) {
+        authorizations.set(tokenId, undefined);
+      } else if (!authorizations.has(tokenId)) {
+        try {
+          authorizations.set(tokenId, await getTokenAuthorized(network, tokenId, address));
+        } catch {
+          authorizations.set(tokenId, undefined);
+        }
+      }
+    })
+  );
+  return authorizations;
+}
