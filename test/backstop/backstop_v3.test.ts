@@ -93,6 +93,26 @@ describe('Blend v3 SDK adapters', () => {
     expect(withdrawal.args()).toHaveLength(5);
     expect(withdrawal.args()[0].vec()?.[0].sym().toString()).toEqual('ThirdLoss');
 
+    const forcedQueue = invocation(
+      contract.forceQueueWithdrawal({
+        tier: BackstopTierV3.SecondLoss,
+        user: userId,
+        pool_address: poolId,
+      })
+    );
+    expect(forcedQueue.functionName().toString()).toEqual('force_queue_withdrawal');
+    expect(forcedQueue.args()).toHaveLength(3);
+
+    const forcedWithdraw = invocation(
+      contract.forceWithdrawal({
+        tier: BackstopTierV3.SecondLoss,
+        user: userId,
+        pool_address: poolId,
+      })
+    );
+    expect(forcedWithdraw.functionName().toString()).toEqual('force_withdrawal');
+    expect(forcedWithdraw.args()).toHaveLength(3);
+
     const buyAndBurn = invocation(contract.buyAndBurn(BackstopAssetV3.Xlm));
     expect(buyAndBurn.functionName().toString()).toEqual('buy_and_burn');
     expect(buyAndBurn.args()).toHaveLength(1);

@@ -29,8 +29,14 @@ export interface BackstopTierConfigV3 {
   take_rate_weight: number;
 }
 
+export interface PoolBackstopConfigV3 {
+  access_controller?: string;
+  tiers: BackstopTierConfigV3[];
+}
+
 export interface DeployV3Args extends DeployV2Args {
   backstop_config: BackstopTierConfigV3[];
+  access_controller?: Address | string;
 }
 
 export abstract class PoolFactoryContract extends Contract {
@@ -212,28 +218,36 @@ export class PoolFactoryContractV3 extends PoolFactoryContractV2 {
       // Function constructor
       'AAAAAAAAAGhDb25zdHJ1Y3QgdGhlIHBvb2wgZmFjdG9yeSBjb250cmFjdAoKIyMjIEFyZ3VtZW50cwoqIGBwb29sX2luaXRfbWV0YWAgLSBUaGUgcG9vbCBpbml0aWFsaXphdGlvbiBtZXRhZGF0YQAAAA1fX2NvbnN0cnVjdG9yAAAAAAAAAQAAAAAAAAAOcG9vbF9pbml0X21ldGEAAAAAB9AAAAAMUG9vbEluaXRNZXRhAAAAAA==',
       // Function deploy
-      'AAAAAAAAAAAAAAAGZGVwbG95AAAAAAAIAAAAAAAAAAVhZG1pbgAAAAAAABMAAAAAAAAABG5hbWUAAAAQAAAAAAAAAARzYWx0AAAD7gAAACAAAAAAAAAABm9yYWNsZQAAAAAAEwAAAAAAAAASYmFja3N0b3BfdGFrZV9yYXRlAAAAAAAEAAAAAAAAAA1tYXhfcG9zaXRpb25zAAAAAAAABAAAAAAAAAAObWluX2NvbGxhdGVyYWwAAAAAAAsAAAAAAAAAD2JhY2tzdG9wX2NvbmZpZwAAAAPqAAAH0AAAABJCYWNrc3RvcFRpZXJDb25maWcAAAAAAAEAAAAT',
+      'AAAAAAAAAAAAAAAGZGVwbG95AAAAAAAJAAAAAAAAAAVhZG1pbgAAAAAAABMAAAAAAAAABG5hbWUAAAAQAAAAAAAAAARzYWx0AAAD7gAAACAAAAAAAAAABm9yYWNsZQAAAAAAEwAAAAAAAAASYmFja3N0b3BfdGFrZV9yYXRlAAAAAAAEAAAAAAAAAA1tYXhfcG9zaXRpb25zAAAAAAAABAAAAAAAAAAObWluX2NvbGxhdGVyYWwAAAAAAAsAAAAAAAAAD2JhY2tzdG9wX2NvbmZpZwAAAAPqAAAH0AAAABJCYWNrc3RvcFRpZXJDb25maWcAAAAAAAAAAAARYWNjZXNzX2NvbnRyb2xsZXIAAAAAAAPoAAAAEwAAAAEAAAAT',
       // Function backstop_config
-      'AAAAAAAAAAAAAAAPYmFja3N0b3BfY29uZmlnAAAAAAEAAAAAAAAADHBvb2xfYWRkcmVzcwAAABMAAAABAAAD6gAAB9AAAAASQmFja3N0b3BUaWVyQ29uZmlnAAA=',
+      'AAAAAAAAAAAAAAAPYmFja3N0b3BfY29uZmlnAAAAAAEAAAAAAAAADHBvb2xfYWRkcmVzcwAAABMAAAABAAAH0AAAABJQb29sQmFja3N0b3BDb25maWcAAA==',
       // Enum BackstopAsset
       'AAAAAgAAAD1PbmUgb2YgdGhlIGZvdXIgY2Fub25pY2FsIGFzc2V0cyBhY2NlcHRlZCBieSB0aGUgdjMgYmFja3N0b3AuAAAAAAAAAAAAAA1CYWNrc3RvcEFzc2V0AAAAAAAABAAAAAAAAAAAAAAAB0JsbmRYbG0AAAAAAAAAAAAAAAAIQmxuZFVzZGMAAAAAAAAAAAAAAARVc2RjAAAAAAAAAAAAAAADWGxtAA==',
       // Struct BackstopTierConfig
       'AAAAAQAAADxPbmUgaW1tdXRhYmxlIGxvc3Mtd2F0ZXJmYWxsIHBvc2l0aW9uIGNvbmZpZ3VyZWQgZm9yIGEgcG9vbC4AAAAAAAAAEkJhY2tzdG9wVGllckNvbmZpZwAAAAAAAgAAADdDYW5vbmljYWwgYXNzZXQgZGVwb3NpdGVkIGludG8gdGhpcyB3YXRlcmZhbGwgcG9zaXRpb24uAAAAAAVhc3NldAAAAAAAB9AAAAANQmFja3N0b3BBc3NldAAAAAAAACVSZWxhdGl2ZSB0YWtlLXJhdGUgYWxsb2NhdGlvbiB3ZWlnaHQuAAAAAAAAEHRha2VfcmF0ZV93ZWlnaHQAAAAE',
+      // Struct PoolBackstopConfig
+      'AAAAAQAAAD1JbW11dGFibGUgcG9vbCBjb25maWd1cmF0aW9uIGNvbnN1bWVkIGJ5IHRoZSBzaGFyZWQgYmFja3N0b3AuAAAAAAAAAAAAABJQb29sQmFja3N0b3BDb25maWcAAAAAAAIAAAAAAAAAEWFjY2Vzc19jb250cm9sbGVyAAAAAAAD6AAAABMAAAAAAAAABXRpZXJzAAAAAAAD6gAAB9AAAAASQmFja3N0b3BUaWVyQ29uZmlnAAA=',
     ]).entries,
   ]);
 
   static readonly parsers = {
     ...PoolFactoryContract.parsers,
-    backstopConfig: (result: string): BackstopTierConfigV3[] =>
-      (
-        PoolFactoryContractV3.spec.funcResToNative('backstop_config', result) as Array<{
-          asset: unknown;
-          take_rate_weight: number;
-        }>
-      ).map((config) => ({
-        asset: parseBackstopAssetV3(config.asset),
-        take_rate_weight: config.take_rate_weight,
-      })),
+    backstopConfig: (result: string): PoolBackstopConfigV3 => {
+      const config = PoolFactoryContractV3.spec.funcResToNative(
+        'backstop_config',
+        result
+      ) as {
+        access_controller?: string | null;
+        tiers: Array<{ asset: unknown; take_rate_weight: number }>;
+      };
+      return {
+        access_controller: config.access_controller ?? undefined,
+        tiers: config.tiers.map((tier) => ({
+          asset: parseBackstopAssetV3(tier.asset),
+          take_rate_weight: tier.take_rate_weight,
+        })),
+      };
+    },
     constructor: (result: string): string => scValToNative(xdr.ScVal.fromXDR(result, 'base64')),
     deployPool: (result: string): string =>
       PoolFactoryContractV3.spec.funcResToNative('deploy', result),
@@ -255,6 +269,7 @@ export class PoolFactoryContractV3 extends PoolFactoryContractV2 {
         asset: { tag: config.asset, values: undefined },
         take_rate_weight: config.take_rate_weight,
       })),
+      access_controller: contractArgs.access_controller,
     };
     return this.call(
       'deploy',

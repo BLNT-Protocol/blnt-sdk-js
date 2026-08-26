@@ -37,6 +37,10 @@ export interface PoolConstructorArgsV2 extends PoolConstructorArgs {
   min_collateral: i128;
 }
 
+export interface PoolConstructorArgsV3 extends PoolConstructorArgsV2 {
+  access_controller?: Address | string;
+}
+
 export interface UpdatePoolV1Args {
   backstop_take_rate: u32;
   max_positions: u32;
@@ -87,6 +91,18 @@ export interface PoolClawbackArgs {
   asset: Address | string;
   from: Address | string;
   amount: i128;
+}
+
+export interface PoolForcedWithdrawArgs {
+  user: Address | string;
+  asset: Address | string;
+}
+
+function omitNamedSpecEntry(entries: xdr.ScSpecEntry[], name: string): xdr.ScSpecEntry[] {
+  return entries.filter((entry) => {
+    const value = entry.value() as unknown as { name?: () => { toString(): string } };
+    return typeof value.name !== 'function' || value.name().toString() !== name;
+  });
 }
 
 export abstract class PoolContract extends Contract {
@@ -852,12 +868,18 @@ export class PoolContractV2 extends PoolContract {
 /** V3 pool adapter. */
 export class PoolContractV3 extends PoolContractV2 {
   static readonly spec = new contract.Spec([
-    ...PoolContractV2.spec.entries,
+    ...omitNamedSpecEntry(PoolContractV2.spec.entries, '__constructor'),
     ...new contract.Spec([
+      // Function constructor
+      'AAAAAAAAAndJbml0aWFsaXplIHRoZSBwb29sCgojIyMgQXJndW1lbnRzCkNyZWF0b3Igc3VwcGxpZWQ6CiogYGFkbWluYCAtIFRoZSBBZGRyZXNzIGZvciB0aGUgYWRtaW4KKiBgbmFtZWAgLSBUaGUgbmFtZSBvZiB0aGUgcG9vbAoqIGBvcmFjbGVgIC0gVGhlIGNvbnRyYWN0IGFkZHJlc3Mgb2YgdGhlIG9yYWNsZQoqIGBiYWNrc3RvcF90YWtlX3JhdGVgIC0gVGhlIHRha2UgcmF0ZSBmb3IgdGhlIGJhY2tzdG9wICg3IGRlY2ltYWxzKQoqIGBtYXhfcG9zaXRpb25zYCAtIFRoZSBtYXhpbXVtIG51bWJlciBvZiBwb3NpdGlvbnMgYSB1c2VyIGlzIHBlcm1pdHRlZCB0byBoYXZlCiogYG1pbl9jb2xsYXRlcmFsYCAtIFRoZSBtaW5pbXVtIGNvbGxhdGVyYWwgcmVxdWlyZWQgdG8gb3BlbiBhIGJvcnJvdyBwb3NpdGlvbiBpbiB0aGUgb3JhY2xlcyBiYXNlIGFzc2V0CgpQb29sIEZhY3Rvcnkgc3VwcGxpZWQ6CiogYGJhY2tzdG9wX2lkYCAtIFRoZSBjb250cmFjdCBhZGRyZXNzIG9mIHRoZSBwb29sJ3MgYmFja3N0b3AgbW9kdWxlCiogYGJsbmRfaWRgIC0gVGhlIGNvbnRyYWN0IElEIG9mIHRoZSBCTE5EIHRva2VuCiogYGFjY2Vzc19jb250cm9sbGVyYCAtIE9wdGlvbmFsIGltbXV0YWJsZSBwb29sIGFjY2VzcyBjb250cm9sbGVyAAAAAA1fX2NvbnN0cnVjdG9yAAAAAAAACQAAAAAAAAAFYWRtaW4AAAAAAAATAAAAAAAAAARuYW1lAAAAEAAAAAAAAAAGb3JhY2xlAAAAAAATAAAAAAAAAApic3RvcF9yYXRlAAAAAAAEAAAAAAAAAA1tYXhfcG9zaXRpb25zAAAAAAAABAAAAAAAAAAObWluX2NvbGxhdGVyYWwAAAAAAAsAAAAAAAAAC2JhY2tzdG9wX2lkAAAAABMAAAAAAAAAB2JsbmRfaWQAAAAAEwAAAAAAAAARYWNjZXNzX2NvbnRyb2xsZXIAAAAAAAPoAAAAEwAAAAA=',
       // Function clawback
       'AAAAAAAAAAAAAAAIY2xhd2JhY2sAAAADAAAAAAAAAAVhc3NldAAAAAAAABMAAAAAAAAABGZyb20AAAATAAAAAAAAAAZhbW91bnQAAAAAAAsAAAAA',
       // Function reconcile_loss
       'AAAAAAAAAAAAAAAOcmVjb25jaWxlX2xvc3MAAAAAAAEAAAAAAAAABWFzc2V0AAAAAAAAEwAAAAEAAAAL',
+      // Function force_withdrawal
+      'AAAAAAAAAAAAAAAQZm9yY2Vfd2l0aGRyYXdhbAAAAAIAAAAAAAAABHVzZXIAAAATAAAAAAAAAAVhc3NldAAAAAAAABMAAAABAAAACw==',
+      // Function new_forced_exit_auction
+      'AAAAAAAAAAAAAAAXbmV3X2ZvcmNlZF9leGl0X2F1Y3Rpb24AAAAAAQAAAAAAAAAEdXNlcgAAABMAAAABAAAH0AAAAAtBdWN0aW9uRGF0YQA=',
     ]).entries,
   ]);
 
@@ -866,7 +888,31 @@ export class PoolContractV3 extends PoolContractV2 {
     clawback: () => {},
     reconcileLoss: (result: string): i128 =>
       PoolContractV3.spec.funcResToNative('reconcile_loss', result),
+    forceWithdrawal: (result: string): i128 =>
+      PoolContractV3.spec.funcResToNative('force_withdrawal', result),
+    newForcedExitAuction: (result: string): AuctionData => AuctionData.fromScVal(result),
   };
+
+  static deploy(
+    deployer: string,
+    wasmHash: Buffer | string,
+    args: PoolConstructorArgsV3,
+    salt?: Buffer,
+    format?: 'hex' | 'base64'
+  ): string {
+    return Operation.createCustomContract({
+      address: Address.fromString(deployer),
+      wasmHash:
+        typeof wasmHash === 'string'
+          ? Buffer.from(wasmHash, format ?? 'hex')
+          : (wasmHash as Buffer),
+      salt,
+      constructorArgs: this.spec.funcArgsToScVals('__constructor', {
+        ...args,
+        access_controller: args.access_controller,
+      }),
+    }).toXDR('base64');
+  }
 
   /**
    * Claws back an exact amount from a user's supplied reserve. The reserve's
@@ -889,6 +935,22 @@ export class PoolContractV3 extends PoolContractV2 {
     return this.call(
       'reconcile_loss',
       ...PoolContractV3.spec.funcArgsToScVals('reconcile_loss', { asset })
+    ).toXDR('base64');
+  }
+
+  /** Return every supplied share for one asset to a user whose supply permission is absent. */
+  forceWithdrawal(contractArgs: PoolForcedWithdrawArgs): string {
+    return this.call(
+      'force_withdrawal',
+      ...PoolContractV3.spec.funcArgsToScVals('force_withdrawal', contractArgs)
+    ).toXDR('base64');
+  }
+
+  /** Create the canonical basket auction that exits a revoked borrower. */
+  newForcedExitAuction(user: Address | string): string {
+    return this.call(
+      'new_forced_exit_auction',
+      ...PoolContractV3.spec.funcArgsToScVals('new_forced_exit_auction', { user })
     ).toXDR('base64');
   }
 }

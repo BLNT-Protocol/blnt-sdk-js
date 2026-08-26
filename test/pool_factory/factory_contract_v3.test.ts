@@ -41,7 +41,7 @@ describe('PoolFactoryContractV3', () => {
     );
 
     expect(deploy.functionName().toString()).toEqual('deploy');
-    expect(deploy.args()).toHaveLength(8);
+    expect(deploy.args()).toHaveLength(9);
     expect(scValToNative(deploy.args()[7])).toEqual([
       {
         asset: ['BlndXlm'],
@@ -52,6 +52,7 @@ describe('PoolFactoryContractV3', () => {
         take_rate_weight: 2,
       },
     ]);
+    expect(scValToNative(deploy.args()[8])).toBeNull();
   });
 
   test('encodes factory reads with their v3 entrypoint names', () => {
@@ -63,5 +64,25 @@ describe('PoolFactoryContractV3', () => {
     expect(scValToNative(isPool.args()[0])).toEqual(poolId);
     expect(config.functionName().toString()).toEqual('backstop_config');
     expect(scValToNative(config.args()[0])).toEqual(poolId);
+  });
+
+  test('parses tiers and the controller from one factory response', () => {
+    const result = PoolFactoryContractV3.spec.nativeToUdt(
+      {
+        access_controller: null,
+        tiers: [
+          {
+            asset: { tag: 'BlndXlm', values: undefined },
+            take_rate_weight: 4,
+          },
+        ],
+      },
+      'PoolBackstopConfig'
+    );
+
+    expect(PoolFactoryContractV3.parsers.backstopConfig(result.toXDR('base64'))).toEqual({
+      access_controller: undefined,
+      tiers: [{ asset: BackstopAssetV3.BlndXlm, take_rate_weight: 4 }],
+    });
   });
 });

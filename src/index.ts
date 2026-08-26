@@ -7,6 +7,7 @@ export * from './pool/index.js';
 export * from './pool_factory/index.js';
 
 export * from './base_event.js';
+export * from './access_controller.js';
 export * from './emissions.js';
 export * as FixedMath from './math.js';
 export * from './oracle.js';

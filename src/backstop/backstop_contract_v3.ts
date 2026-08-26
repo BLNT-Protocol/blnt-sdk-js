@@ -74,6 +74,12 @@ export interface TierBackstopWithdrawArgsV3 extends TierBackstopActionArgsV3 {
   to: Address | string;
 }
 
+export interface ForcedBackstopExitArgsV3 {
+  tier: BackstopTierV3;
+  user: Address | string;
+  pool_address: Address | string;
+}
+
 export interface BackstopClaimArgsV3 {
   tier: BackstopTierV3;
   from: Address | string;
@@ -143,6 +149,8 @@ export class BackstopContractV3 extends Contract {
     queueWithdrawal: (result: string): Q4WV3 => parseNative(result),
     dequeueWithdrawal: () => {},
     withdraw: (result: string): i128 => parseNative(result),
+    forceQueueWithdrawal: (result: string): Q4WV3 => parseNative(result),
+    forceWithdrawal: (result: string): i128 => parseNative(result),
     userBalance: (result: string): UserBalanceV3 => parseNative(result),
     poolData: (result: string): PoolBackstopDataV3 => parsePoolData(result),
     backstopToken: (result: string): string => parseNative(result),
@@ -232,6 +240,24 @@ export class BackstopContractV3 extends Contract {
       addressToScVal(args.pool_address),
       i128ToScVal(args.amount),
       addressToScVal(args.to)
+    ).toXDR('base64');
+  }
+
+  forceQueueWithdrawal(args: ForcedBackstopExitArgsV3): string {
+    return this.call(
+      'force_queue_withdrawal',
+      tierToScVal(args.tier),
+      addressToScVal(args.user),
+      addressToScVal(args.pool_address)
+    ).toXDR('base64');
+  }
+
+  forceWithdrawal(args: ForcedBackstopExitArgsV3): string {
+    return this.call(
+      'force_withdrawal',
+      tierToScVal(args.tier),
+      addressToScVal(args.user),
+      addressToScVal(args.pool_address)
     ).toXDR('base64');
   }
 

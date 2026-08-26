@@ -14,7 +14,9 @@ export class PoolMetadata {
     public oracle: string,
     public status: number,
     public reserveList: string[],
-    public latestLedger: number
+    public latestLedger: number,
+    /** Immutable v3 controller address; undefined means permissionless. */
+    public accessController?: string
   ) {}
 
   static async load(network: Network, poolId: string) {
@@ -56,6 +58,7 @@ export class PoolMetadata {
     let backstop: string | undefined;
     let poolConfig: PoolConfig | undefined;
     let reserveList: string[] | undefined;
+    let accessController: string | undefined;
 
     const poolConfigEntries = await stellarRpc.getLedgerEntries(
       contractInstanceKey,
@@ -87,6 +90,13 @@ export class PoolMetadata {
               case 'IsInit':
                 // do nothing
                 break;
+              case 'AccessCtrl': {
+                const controller = scValToNative(entry.val());
+                if (controller !== null && controller !== undefined) {
+                  accessController = controller as string;
+                }
+                break;
+              }
               default:
                 if (!allowCandidateInstanceKeys) {
                   throw Error(
@@ -129,7 +139,8 @@ export class PoolMetadata {
       poolConfig.oracle,
       poolConfig.status,
       reserveList,
-      poolConfigEntries.latestLedger
+      poolConfigEntries.latestLedger,
+      accessController
     );
   }
 }
