@@ -3,7 +3,7 @@ import { Network } from '../index.js';
 import { decodeEntryKey } from '../ledger_entry_helper.js';
 
 /**
- * Ledger data for the Comet BLND/USDC LP
+ * Ledger data for the Comet v1 BLND/USDC LP
  */
 export class BackstopToken {
   constructor(

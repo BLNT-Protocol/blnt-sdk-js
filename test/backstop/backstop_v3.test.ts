@@ -113,10 +113,12 @@ describe('Blend v3 SDK adapters', () => {
     expect(forcedWithdraw.functionName().toString()).toEqual('force_withdrawal');
     expect(forcedWithdraw.args()).toHaveLength(3);
 
-    const buyAndBurn = invocation(contract.buyAndBurn(BackstopAssetV3.Xlm));
-    expect(buyAndBurn.functionName().toString()).toEqual('buy_and_burn');
-    expect(buyAndBurn.args()).toHaveLength(1);
-    expect(buyAndBurn.args()[0].vec()?.[0].sym().toString()).toEqual('Xlm');
+    const blntPrice = invocation(contract.blntPrice());
+    expect(blntPrice.functionName().toString()).toEqual('blnt_price');
+    expect(blntPrice.args()).toHaveLength(0);
+    expect(BackstopContractV3.parsers.blntPrice(i128(1_250_000n).toXDR('base64'))).toEqual(
+      1_250_000n
+    );
   });
 
   test('decodes exact v3 migration state from contract-instance storage', () => {

@@ -57,7 +57,7 @@ export enum ContractErrorType {
   OverflowError = 12,
   TrustlineMissingError = 13,
 
-  // Potential Comet Errors
+  // Potential Comet v1/v2 errors
   CometErrFreezeOnlyWithdrawals = 14,
   CometErrMaxInRatio = 17,
   CometErrMathApprox = 18,

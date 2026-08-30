@@ -99,10 +99,6 @@ function tierToScVal(tier: BackstopTierV3): xdr.ScVal {
   return xdr.ScVal.scvVec([xdr.ScVal.scvSymbol(tier)]);
 }
 
-function assetToScVal(asset: BackstopAssetV3): xdr.ScVal {
-  return xdr.ScVal.scvVec([xdr.ScVal.scvSymbol(asset)]);
-}
-
 function addressesToScVal(addresses: Array<Address | string>): xdr.ScVal {
   return xdr.ScVal.scvVec(addresses.map(addressToScVal));
 }
@@ -153,9 +149,9 @@ export class BackstopContractV3 extends Contract {
     forceWithdrawal: (result: string): i128 => parseNative(result),
     userBalance: (result: string): UserBalanceV3 => parseNative(result),
     poolData: (result: string): PoolBackstopDataV3 => parsePoolData(result),
+    blntPrice: (result: string): i128 => parseNative(result),
     backstopToken: (result: string): string => parseNative(result),
     drop: () => {},
-    buyAndBurn: (result: string): i128 => parseNative(result),
     distribute: (result: string): i128 => parseNative(result),
     claim: (result: string): i128 => parseNative(result),
     gulpEmissions: (result: string): i128 => parseNative(result),
@@ -274,16 +270,16 @@ export class BackstopContractV3 extends Contract {
     return this.call('pool_data', addressToScVal(pool)).toXDR('base64');
   }
 
+  blntPrice(): string {
+    return this.call('blnt_price').toXDR('base64');
+  }
+
   backstopToken(tier: BackstopTierV3, pool: Address | string): string {
     return this.call('backstop_token', tierToScVal(tier), addressToScVal(pool)).toXDR('base64');
   }
 
   drop(): string {
     return this.call('drop').toXDR('base64');
-  }
-
-  buyAndBurn(asset: BackstopAssetV3): string {
-    return this.call('buy_and_burn', assetToScVal(asset)).toXDR('base64');
   }
 
   distribute(): string {

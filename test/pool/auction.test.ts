@@ -1,8 +1,15 @@
 import { Auction, AuctionType, getAuctionsfromV1Events } from '../../src/pool/auction.js';
+import { AuctionType as PoolAuctionType, RequestType } from '../../src/pool/index.js';
 import { BlendContractType, PoolV1Event, PoolEventType } from '../../src/index.js';
 import { i128 } from '../../src/index.js';
 
 describe('Auction', () => {
+  test('exports protocol-fee auction discriminants', () => {
+    expect(AuctionType.ProtocolFee).toBe(3);
+    expect(PoolAuctionType.ProtocolFee).toBe(3);
+    expect(RequestType.FillProtocolFeeAuction).toBe(10);
+  });
+
   it('test auction scaling', () => {
     const auction = new Auction('user', AuctionType.Liquidation, {
       lot: new Map<string, bigint>([

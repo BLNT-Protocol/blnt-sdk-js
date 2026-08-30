@@ -60,6 +60,7 @@ export enum RequestType {
   FillBadDebtAuction = 7,
   FillInterestAuction = 8,
   DeleteLiquidationAuction = 9,
+  FillProtocolFeeAuction = 10,
 }
 
 /**
@@ -244,6 +245,7 @@ export enum AuctionType {
   Liquidation = 0,
   BadDebt = 1,
   Interest = 2,
+  ProtocolFee = 3,
 }
 
 export type PoolDataKey =

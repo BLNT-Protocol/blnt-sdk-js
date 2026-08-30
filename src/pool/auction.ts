@@ -5,6 +5,7 @@ export enum AuctionType {
   Liquidation = 0,
   BadDebt = 1,
   Interest = 2,
+  ProtocolFee = 3,
 }
 
 export interface Auctions {
