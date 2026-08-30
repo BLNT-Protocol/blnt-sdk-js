@@ -145,7 +145,7 @@ function parseUserEmission(value: xdr.ScVal): UserEmissionEstimateDataV3 {
   };
 }
 
-function validateClaimRequest(tier: BackstopTierV3, pools: string[]): void {
+function validateClaimRequest(pools: string[]): void {
   if (pools.length === 0 || new Set(pools).size !== pools.length) {
     throw new Error('Claim estimate requires unique pool addresses');
   }
@@ -208,7 +208,7 @@ export class BackstopEmissionsV3 {
     pools: string[],
     timestamp: u64 = BigInt(Math.floor(Date.now() / 1000))
   ): Promise<BackstopClaimableEstimateV3> {
-    validateClaimRequest(tier, pools);
+    validateClaimRequest(pools);
     const requestEntries: Array<{
       kind: LedgerValueKind;
       key: xdr.LedgerKey;

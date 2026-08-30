@@ -241,13 +241,6 @@ export class PoolConfig {
   }
 }
 
-export enum AuctionType {
-  Liquidation = 0,
-  BadDebt = 1,
-  Interest = 2,
-  ProtocolFee = 3,
-}
-
 export type PoolDataKey =
   | { tag: 'Admin' }
   | { tag: 'Name' }
