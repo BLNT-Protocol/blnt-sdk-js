@@ -18,8 +18,8 @@ export enum BackstopTierV3 {
 
 /** Canonical assets permitted in a Blend v3 backstop configuration. */
 export enum BackstopAssetV3 {
-  BlndXlm = 'BlndXlm',
-  BlndUsdc = 'BlndUsdc',
+  BlntXlm = 'BlntXlm',
+  BlntUsdc = 'BlntUsdc',
   Usdc = 'Usdc',
   Xlm = 'Xlm',
 }
@@ -36,7 +36,7 @@ export interface UserBalanceV3 {
 
 export interface PoolTierDataV3 {
   asset: BackstopAssetV3;
-  blnd_emission_eligible: boolean;
+  blnt_emission_eligible: boolean;
   take_rate_weight: number;
   token: string;
   shares: i128;

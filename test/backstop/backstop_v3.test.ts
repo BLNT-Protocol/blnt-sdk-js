@@ -38,8 +38,8 @@ function u64(value: bigint): xdr.ScVal {
 
 function tierData(value: bigint, tokens: bigint, shares: bigint) {
   return {
-    asset: BackstopAssetV3.BlndXlm,
-    blnd_emission_eligible: true,
+    asset: BackstopAssetV3.BlntXlm,
+    blnt_emission_eligible: true,
     take_rate_weight: 1,
     token: contractId,
     tokens,
@@ -175,7 +175,7 @@ describe('Blend v3 SDK adapters', () => {
           {
             ...tierData(0n, 100n, 100n),
             asset: BackstopAssetV3.Usdc,
-            blnd_emission_eligible: false,
+            blnt_emission_eligible: false,
           },
         ],
       },

@@ -29,7 +29,7 @@ describe('PoolFactoryContractV3', () => {
         min_collateral: 100n,
         backstop_config: [
           {
-            asset: BackstopAssetV3.BlndXlm,
+            asset: BackstopAssetV3.BlntXlm,
             take_rate_weight: 4,
           },
           {
@@ -44,7 +44,7 @@ describe('PoolFactoryContractV3', () => {
     expect(deploy.args()).toHaveLength(9);
     expect(scValToNative(deploy.args()[7])).toEqual([
       {
-        asset: ['BlndXlm'],
+        asset: ['BlntXlm'],
         take_rate_weight: 4,
       },
       {
@@ -72,7 +72,7 @@ describe('PoolFactoryContractV3', () => {
         access_controller: null,
         tiers: [
           {
-            asset: { tag: 'BlndXlm', values: undefined },
+            asset: { tag: 'BlntXlm', values: undefined },
             take_rate_weight: 4,
           },
         ],
@@ -82,7 +82,7 @@ describe('PoolFactoryContractV3', () => {
 
     expect(PoolFactoryContractV3.parsers.backstopConfig(result.toXDR('base64'))).toEqual({
       access_controller: undefined,
-      tiers: [{ asset: BackstopAssetV3.BlndXlm, take_rate_weight: 4 }],
+      tiers: [{ asset: BackstopAssetV3.BlntXlm, take_rate_weight: 4 }],
     });
   });
 });

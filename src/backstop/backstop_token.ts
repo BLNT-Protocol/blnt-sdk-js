@@ -1,9 +1,41 @@
-import { Address, rpc, scValToNative, xdr } from '@stellar/stellar-sdk';
+import { Address, Contract, rpc, scValToNative, xdr } from '@stellar/stellar-sdk';
 import { Network } from '../index.js';
 import { decodeEntryKey } from '../ledger_entry_helper.js';
+import { simulateAndParse } from '../simulation_helper.js';
+
+function parseI128(result: string): bigint {
+  return scValToNative(xdr.ScVal.fromXDR(result, 'base64')) as bigint;
+}
+
+async function loadCometPublicData(
+  network: Network,
+  id: string,
+  blndTkn: string,
+  usdcTkn: string
+): Promise<[bigint, bigint, bigint]> {
+  const comet = new Contract(id);
+  const [blnd, usdc, totalShares] = await Promise.all([
+    simulateAndParse(
+      network,
+      comet.call('get_balance', Address.fromString(blndTkn).toScVal()).toXDR('base64'),
+      parseI128
+    ),
+    simulateAndParse(
+      network,
+      comet.call('get_balance', Address.fromString(usdcTkn).toScVal()).toXDR('base64'),
+      parseI128
+    ),
+    simulateAndParse(
+      network,
+      comet.call('get_total_supply').toXDR('base64'),
+      parseI128
+    ),
+  ]);
+  return [blnd.result, usdc.result, totalShares.result];
+}
 
 /**
- * Ledger data for the Comet v1 BLND/USDC LP
+ * Ledger data for a Comet backstop LP
  */
 export class BackstopToken {
   constructor(
@@ -89,7 +121,15 @@ export class BackstopToken {
     }
 
     if (blnd === undefined || usdc === undefined || totalShares === undefined) {
-      throw new Error('Invalid backstop token data');
+      // Comet v2 intentionally does not retain Comet v1's AllRecordData and
+      // TotalShares storage layout. Its stable public getters expose the same
+      // values without coupling the SDK to private contract storage.
+      [blnd, usdc, totalShares] = await loadCometPublicData(
+        network,
+        id,
+        blndTkn,
+        usdcTkn
+      );
     }
 
     const blndPerLpToken = Number(blnd) / Number(totalShares);
