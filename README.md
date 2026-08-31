@@ -16,7 +16,7 @@ Each Blend Protocol contract exports a contract class for interacting with the c
 
 NOTE: There is an outstanding issue passing XDR objects between packages. See the following issue for more details: https://github.com/stellar/js-stellar-base/issues/617
 
-Both the [blend-utils](https://github.com/blend-capital/blend-utils) and [blnt-ui](https://github.com/levinson/blnt-ui) repositories make extensive use of this SDK for reference.
+Both the [blend-utils](https://github.com/blend-capital/blend-utils) and [blnt-ui](https://github.com/blnt-protocol/blnt-ui) repositories make extensive use of this SDK for reference.
 
 ### Blend v3
 
