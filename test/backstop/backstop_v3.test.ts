@@ -192,14 +192,24 @@ describe('Blend v3 SDK adapters', () => {
     expect(pool.tier(BackstopTierV3.FirstLoss).isDeauthorized).toBe(false);
   });
 
-  test('rejects pool data outside the one-to-three tier bound', () => {
+  test('supports pools with no backstop tiers', () => {
+    const pool = new BackstopPoolV3({ active_value: 0n, q4w_pct: 0n, tiers: [] }, 123);
+
+    expect(pool.configuredTiers).toEqual([]);
+    expect(pool.tiers).toEqual({});
+    expect(pool.totalActiveValue()).toEqual(0n);
+    expect(pool.totalValue()).toEqual(0n);
+  });
+
+  test('rejects pool data above the three-tier bound', () => {
+    const tier = tierData(1n, 1n, 1n);
     expect(
       () =>
         new BackstopPoolV3(
-          { active_value: 0n, q4w_pct: 0n, tiers: [] },
+          { active_value: 0n, q4w_pct: 0n, tiers: [tier, tier, tier, tier] },
           1
         )
-    ).toThrow('between one and three');
+    ).toThrow('between zero and three');
   });
 
   test('estimates v3 backstop BLND without contract-internal carry', () => {

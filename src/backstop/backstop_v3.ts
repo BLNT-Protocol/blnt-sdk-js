@@ -20,8 +20,8 @@ export const BACKSTOP_TIERS_V3 = [
 export type BackstopTierMapV3<T> = Partial<Record<BackstopTierV3, T>>;
 
 export function configuredBackstopTiersV3(count: number): BackstopTierV3[] {
-  if (!Number.isInteger(count) || count < 1 || count > BACKSTOP_TIERS_V3.length) {
-    throw new Error('A v3 pool must configure between one and three backstop tiers');
+  if (!Number.isInteger(count) || count < 0 || count > BACKSTOP_TIERS_V3.length) {
+    throw new Error('A v3 pool must configure between zero and three backstop tiers');
   }
   return BACKSTOP_TIERS_V3.slice(0, count);
 }
@@ -128,7 +128,10 @@ export class BackstopPoolUserV3 {
       userId,
       poolId,
       balances,
-      Math.max(...responses.map((response) => response.latestLedger))
+      responses.reduce(
+        (latestLedger, response) => Math.max(latestLedger, response.latestLedger),
+        pool.latestLedger
+      )
     );
   }
 
