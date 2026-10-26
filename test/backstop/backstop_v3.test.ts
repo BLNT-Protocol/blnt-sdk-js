@@ -6,6 +6,7 @@ import {
   estimatePoolClaimableV3,
   BackstopPoolV3,
   BackstopTierV3,
+  annualizedBackstopEmissionV3,
   decodeInterestReserveStateV3,
   MigrationStatusV3,
   PoolBackstopDataV3,
@@ -49,6 +50,23 @@ function tierData(value: bigint, tokens: bigint, shares: bigint) {
 }
 
 describe('Blend v3 SDK adapters', () => {
+  test('annualizes active tier emission streams at their current rate', () => {
+    const now = 1_000n;
+    expect(
+      annualizedBackstopEmissionV3(
+        { expiration: now + 1n, eps: 100_000_000_000_000n, index: 0n, last_time: now },
+        now
+      )
+    ).toEqual(315_360_000_000_000n);
+    expect(
+      annualizedBackstopEmissionV3(
+        { expiration: now, eps: 100_000_000_000_000n, index: 0n, last_time: now },
+        now
+      )
+    ).toEqual(0n);
+    expect(annualizedBackstopEmissionV3(undefined, now)).toEqual(0n);
+  });
+
   test('encodes tier-aware backstop operations with the v3 ABI', () => {
     const contract = new BackstopContractV3(contractId);
     const deposit = invocation(
@@ -205,10 +223,7 @@ describe('Blend v3 SDK adapters', () => {
     const tier = tierData(1n, 1n, 1n);
     expect(
       () =>
-        new BackstopPoolV3(
-          { active_value: 0n, q4w_pct: 0n, tiers: [tier, tier, tier, tier] },
-          1
-        )
+        new BackstopPoolV3({ active_value: 0n, q4w_pct: 0n, tiers: [tier, tier, tier, tier] }, 1)
     ).toThrow('between zero and three');
   });
 

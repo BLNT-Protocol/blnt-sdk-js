@@ -33,6 +33,11 @@ export interface BackstopClaimableEstimateV3 {
   timestamp: u64;
 }
 
+export interface BackstopPoolEmissionsV3 {
+  by_tier: Partial<Record<BackstopTierV3, BackstopEmissionEstimateDataV3>>;
+  latest_ledger: number;
+}
+
 type PoolLedgerState = {
   emission?: BackstopEmissionEstimateDataV3;
   pool_queued_shares: bigint;
@@ -151,6 +156,20 @@ function validateClaimRequest(pools: string[]): void {
   }
 }
 
+/** Annualize one active v3 backstop stream into a seven-decimal BLNT amount. */
+export function annualizedBackstopEmissionV3(
+  emission: BackstopEmissionEstimateDataV3 | undefined,
+  timestamp: u64 = BigInt(Math.floor(Date.now() / 1000))
+): i128 {
+  if (emission === undefined || emission.expiration <= timestamp) {
+    return 0n;
+  }
+  if (emission.eps < 0n || emission.expiration < 0n) {
+    throw new Error('Invalid v3 backstop emission data');
+  }
+  return (emission.eps * 31_536_000n) / SCALAR_7;
+}
+
 /** Estimate one pool's claim without consuming contract-internal rounding carry. */
 export function estimatePoolClaimableV3(state: PoolClaimableEstimateStateV3, timestamp: u64): i128 {
   if (
@@ -200,6 +219,42 @@ export function estimatePoolClaimableV3(state: PoolClaimableEstimateStateV3, tim
 
 /** Off-chain v2-style estimator for one user's v3 backstop BLND claim. */
 export class BackstopEmissionsV3 {
+  /** Load the current emission stream for every requested tier of one pool. */
+  static async loadPoolEmissions(
+    network: Network,
+    backstopId: string,
+    pool: string,
+    tiers: BackstopTierV3[]
+  ): Promise<BackstopPoolEmissionsV3> {
+    const uniqueTiers = [...new Set(tiers)];
+    if (uniqueTiers.length !== tiers.length) {
+      throw new Error('Pool emission estimate requires unique tiers');
+    }
+    if (tiers.length === 0) {
+      return { by_tier: {}, latest_ledger: 0 };
+    }
+
+    const requests = tiers.map((tier) => {
+      const key = ledgerKey(backstopId, enumKey('BEmisData', poolTierKey(pool, tier)));
+      return { key, tier };
+    });
+    const requestedByKey = new Map(
+      requests.map(({ key, tier }) => [key.contractData().key().toXDR('base64'), tier])
+    );
+    const stellarRpc = new rpc.Server(network.rpc, network.opts);
+    const response = await stellarRpc.getLedgerEntries(...requests.map(({ key }) => key));
+    const byTier: Partial<Record<BackstopTierV3, BackstopEmissionEstimateDataV3>> = {};
+    for (const entry of response.entries) {
+      const contractData = entry.val.contractData();
+      const tier = requestedByKey.get(contractData.key().toXDR('base64'));
+      if (tier === undefined) {
+        throw new Error('Unexpected ledger entry while loading v3 backstop emissions');
+      }
+      byTier[tier] = parseEmission(contractData.val());
+    }
+    return { by_tier: byTier, latest_ledger: response.latestLedger };
+  }
+
   static async estimateClaimable(
     network: Network,
     backstopId: string,
