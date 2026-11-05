@@ -2,6 +2,7 @@ import { Buffer } from 'buffer';
 import {
   BackstopContractV3,
   BackstopAssetV3,
+  activeBackstopTierSharesV3,
   decodeMigrationStateV3,
   estimatePoolClaimableV3,
   BackstopPoolV3,
@@ -50,6 +51,14 @@ function tierData(value: bigint, tokens: bigint, shares: bigint) {
 }
 
 describe('Blend v3 SDK adapters', () => {
+  test('derives active tier shares by excluding queued withdrawals', () => {
+    expect(activeBackstopTierSharesV3({ shares: 100n, q4w: 25n })).toEqual(75n);
+    expect(activeBackstopTierSharesV3(undefined)).toEqual(0n);
+    expect(() => activeBackstopTierSharesV3({ shares: 25n, q4w: 26n })).toThrow(
+      'Invalid v3 backstop pool balance data'
+    );
+  });
+
   test('annualizes active tier emission streams at their current rate', () => {
     const now = 1_000n;
     expect(

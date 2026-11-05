@@ -13,6 +13,11 @@ export interface BackstopEmissionEstimateDataV3 {
   last_time: u64;
 }
 
+export interface BackstopPoolBalanceEstimateDataV3 {
+  shares: i128;
+  q4w: i128;
+}
+
 export interface UserEmissionEstimateDataV3 {
   accrued: i128;
   index: i128;
@@ -35,6 +40,7 @@ export interface BackstopClaimableEstimateV3 {
 
 export interface BackstopPoolEmissionsV3 {
   by_tier: Partial<Record<BackstopTierV3, BackstopEmissionEstimateDataV3>>;
+  pool_balance_by_tier: Partial<Record<BackstopTierV3, BackstopPoolBalanceEstimateDataV3>>;
   latest_ledger: number;
 }
 
@@ -78,6 +84,12 @@ function poolUserTierKey(pool: string, tier: BackstopTierV3, user: string): xdr.
   ]);
 }
 
+function poolBalanceKey(pool: string, tier: BackstopTierV3): xdr.ScVal {
+  return tier === BackstopTierV3.SecondLoss
+    ? enumKey('PoolBalance', Address.fromString(pool).toScVal())
+    : enumKey('TierPoolBalance', poolTierKey(pool, tier));
+}
+
 function enumKey(name: string, value: xdr.ScVal): xdr.ScVal {
   return xdr.ScVal.scvVec([xdr.ScVal.scvSymbol(name), value]);
 }
@@ -100,16 +112,12 @@ function poolLedgerKeys(
 ): Array<readonly [LedgerValueKind, xdr.LedgerKey]> {
   const tierKey = poolTierKey(pool, tier);
   const userTierKey = poolUserTierKey(pool, tier, user);
-  const poolBalanceKey =
-    tier === BackstopTierV3.SecondLoss
-      ? enumKey('PoolBalance', Address.fromString(pool).toScVal())
-      : enumKey('TierPoolBalance', tierKey);
   const userBalanceKey =
     tier === BackstopTierV3.SecondLoss
       ? enumKey('UserBalance', poolUserKey(pool, user))
       : enumKey('TierUserBalance', userTierKey);
   return [
-    ['pool_balance', ledgerKey(backstopId, poolBalanceKey)],
+    ['pool_balance', ledgerKey(backstopId, poolBalanceKey(pool, tier))],
     ['user_balance', ledgerKey(backstopId, userBalanceKey)],
     ['emission', ledgerKey(backstopId, enumKey('BEmisData', tierKey))],
     ['user_emission', ledgerKey(backstopId, enumKey('UEmisData', userTierKey))],
@@ -148,6 +156,26 @@ function parseUserEmission(value: xdr.ScVal): UserEmissionEstimateDataV3 {
     accrued: requiredBigInt(values, 'accrued'),
     index: requiredBigInt(values, 'index'),
   };
+}
+
+export function activeBackstopTierSharesV3(
+  balance: BackstopPoolBalanceEstimateDataV3 | undefined
+): i128 {
+  if (balance === undefined) return 0n;
+  if (balance.shares < 0n || balance.q4w < 0n || balance.q4w > balance.shares) {
+    throw new Error('Invalid v3 backstop pool balance data');
+  }
+  return balance.shares - balance.q4w;
+}
+
+function parsePoolBalance(value: xdr.ScVal): BackstopPoolBalanceEstimateDataV3 {
+  const values = mapValues(value);
+  const balance = {
+    shares: requiredBigInt(values, 'shares'),
+    q4w: requiredBigInt(values, 'q4w'),
+  };
+  activeBackstopTierSharesV3(balance);
+  return balance;
 }
 
 function validateClaimRequest(pools: string[]): void {
@@ -231,28 +259,49 @@ export class BackstopEmissionsV3 {
       throw new Error('Pool emission estimate requires unique tiers');
     }
     if (tiers.length === 0) {
-      return { by_tier: {}, latest_ledger: 0 };
+      return { by_tier: {}, pool_balance_by_tier: {}, latest_ledger: 0 };
     }
 
-    const requests = tiers.map((tier) => {
-      const key = ledgerKey(backstopId, enumKey('BEmisData', poolTierKey(pool, tier)));
-      return { key, tier };
-    });
+    const requests = tiers.flatMap((tier) => [
+      {
+        key: ledgerKey(backstopId, enumKey('BEmisData', poolTierKey(pool, tier))),
+        kind: 'emission' as const,
+        tier,
+      },
+      {
+        key: ledgerKey(backstopId, poolBalanceKey(pool, tier)),
+        kind: 'pool_balance' as const,
+        tier,
+      },
+    ]);
     const requestedByKey = new Map(
-      requests.map(({ key, tier }) => [key.contractData().key().toXDR('base64'), tier])
+      requests.map((request) => [request.key.contractData().key().toXDR('base64'), request])
     );
     const stellarRpc = new rpc.Server(network.rpc, network.opts);
     const response = await stellarRpc.getLedgerEntries(...requests.map(({ key }) => key));
     const byTier: Partial<Record<BackstopTierV3, BackstopEmissionEstimateDataV3>> = {};
+    const poolBalanceByTier: Partial<Record<BackstopTierV3, BackstopPoolBalanceEstimateDataV3>> =
+      {};
+    for (const tier of tiers) {
+      poolBalanceByTier[tier] = { shares: 0n, q4w: 0n };
+    }
     for (const entry of response.entries) {
       const contractData = entry.val.contractData();
-      const tier = requestedByKey.get(contractData.key().toXDR('base64'));
-      if (tier === undefined) {
+      const request = requestedByKey.get(contractData.key().toXDR('base64'));
+      if (request === undefined) {
         throw new Error('Unexpected ledger entry while loading v3 backstop emissions');
       }
-      byTier[tier] = parseEmission(contractData.val());
+      if (request.kind === 'emission') {
+        byTier[request.tier] = parseEmission(contractData.val());
+      } else {
+        poolBalanceByTier[request.tier] = parsePoolBalance(contractData.val());
+      }
     }
-    return { by_tier: byTier, latest_ledger: response.latestLedger };
+    return {
+      by_tier: byTier,
+      pool_balance_by_tier: poolBalanceByTier,
+      latest_ledger: response.latestLedger,
+    };
   }
 
   static async estimateClaimable(
