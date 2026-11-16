@@ -1,24 +1,28 @@
-# blnt-sdk-js
+# BLNT SDK for JavaScript
 
-Blend Protocol SDK for Javascript to assist in interacting with the Blend Protocol.
+Client SDK for BLNT V3, an immutable Blend-derived lending protocol on Stellar.
+It also retains inherited APIs for interacting with compatible Blend contracts.
 
 ## Getting Started
 
 1. Install it using npm:
 
 ```bash
-npm install @blend-capital/blend-sdk
+npm install @blnt-protocol/blnt-sdk
 ```
 
 ## Usage
 
-Each Blend Protocol contract exports a contract class for interacting with the contract. Some contracts, like the Pool, include additional classes to help read ledger state.
+Each supported contract exports a contract class for interacting with the
+contract. Some contracts, such as pools, include additional classes for reading
+ledger state.
 
 NOTE: There is an outstanding issue passing XDR objects between packages. See the following issue for more details: https://github.com/stellar/js-stellar-base/issues/617
 
-Both the [blend-utils](https://github.com/blend-capital/blend-utils) and [blnt-ui](https://github.com/blnt-protocol/blnt-ui) repositories make extensive use of this SDK for reference.
+The [BLNT Trade UI](https://github.com/BLNT-Protocol/blnt-ui) uses this SDK and
+provides a complete integration reference.
 
-### Blend v3
+### BLNT V3
 
 V3 reuses the v2 pool representation through `PoolV3` and `PoolContractV3`.
 Its backstop remains explicitly tiered:
@@ -30,7 +34,7 @@ import {
   BackstopTierV3,
   Network,
   PoolV3,
-} from '@blend-capital/blend-sdk';
+} from '@blnt-protocol/blnt-sdk';
 
 const pool = await PoolV3.load(network as Network, poolId);
 const backstop = await BackstopPoolV3.load(network as Network, backstopId, pool.id);
@@ -53,7 +57,7 @@ backstop value.
 The contract class creates an operation as a base64 XDR string that can be used with the `@stellar/stellar-sdk` [TransactionBuilder class](https://stellar.github.io/js-stellar-sdk/TransactionBuilder.html). When interacting with Soroban contracts, the invoker must populate the `SorobanData` portion of the transaction. The `@stellar/stellar-sdk` provides an easy way to do this by simulating the transaction against an RPC. For more details about how to submit a Soroban operation to the Stellar network, please see: https://developers.stellar.org/docs/build/guides/transactions/invoke-contract-tx-sdk
 
 ```ts
-import { PoolContract, RequestType } from '@blend-capital/blend-sdk';
+import { PoolContract, RequestType } from '@blnt-protocol/blnt-sdk';
 import { xdr } from '@stellar/stellar-sdk';
 
 const asset: Address = // C... the Address of the asset to lend
@@ -98,7 +102,7 @@ import {
   PoolEstimate,
   PoolOracle,
   PositionsEstimate,
-} from '@blend-capital/blend-sdk';
+} from '@blnt-protocol/blnt-sdk';
 
 const network: Network = {
   rpc: // rpc URL,
