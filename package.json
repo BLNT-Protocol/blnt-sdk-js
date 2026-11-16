@@ -22,13 +22,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/blnt-protocol/blnt-sdk-js.git"
+    "url": "git+https://github.com/BLNT-Protocol/blnt-sdk-js.git"
   },
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/blnt-protocol/blnt-sdk-js/issues"
+    "url": "https://github.com/BLNT-Protocol/blnt-sdk-js/issues"
   },
-  "homepage": "https://github.com/blnt-protocol/blnt-sdk-js#readme",
+  "homepage": "https://github.com/BLNT-Protocol/blnt-sdk-js#readme",
   "devDependencies": {
     "@types/jest": "^29.5.0",
     "@typescript-eslint/eslint-plugin": "^5.59.0",
