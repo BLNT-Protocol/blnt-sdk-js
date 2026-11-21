@@ -1,5 +1,5 @@
 import { toFixed } from '../../src/math.js';
-import { ReserveV1, ReserveV2 } from '../../src/pool/reserve.js';
+import { ReserveV1, ReserveV2, V3_PROTOCOL_INTEREST_FEE_RATE } from '../../src/pool/reserve.js';
 import { ReserveConfig, ReserveData } from '../../src/pool/reserve_types.js';
 
 test('reserve accrual', () => {
@@ -257,4 +257,74 @@ test('reserve v2 zero utilization applies interest rate modifier with zero targe
   expect(reserve.estBorrowApy).toBeCloseTo(0.015113, 6);
   expect(reserve.supplyApr).toEqual(0);
   expect(reserve.estSupplyApy).toEqual(0);
+});
+
+// The USDC reserve of the mainnet Fixed pool (CACSQWCMKG45TUHCQ3LXHOB7YEEJH4W376ZHQPXH2IZ3TE4NJHFZMCY7)
+// as two consecutive transactions stored it:
+//   ledger 65588469, tx a22a500b85fffefb5ff2ea187b4dd97e803faece3aac15984b5de4bbf77d219d
+//   ledger 65588957, tx 1f64333fe814cc8d39fd8cb2714d4783fe183c8d92d9ccb7f507e6637d40bcec
+// Nothing touched the reserve in between, so the rates, the rate modifier and the backstop credit
+// of the second state are the pool contract's own accrual of the first.
+function mainnetV3Reserve(): ReserveV2 {
+  const config = new ReserveConfig(
+    1, // index
+    7, // decimals
+    9500000, // c_factor
+    9500000, // l_factor
+    8000000, // util
+    9000000, // max_util
+    300000, // r_base
+    400000, // r_one
+    1200000, // r_two
+    5_0000000, // r_three
+    20 // reactivity
+  );
+  const data = new ReserveData(
+    BigInt(1_003_088_534_238), // d_rate
+    BigInt(1_001_768_774_020), // b_rate
+    BigInt(5440870), // ir_mod
+    BigInt(1442701978272), // d_supply
+    BigInt(1686791809828), // b_supply
+    BigInt(227573983), // backstop_credit
+    1795228389 // last_time
+  );
+  return new ReserveV2('poolId', 'assetId', config, data, undefined, undefined, 0, 0, 0, 0, 123);
+}
+
+test('reserve accrual v3 takes the protocol interest fee before the backstop share', () => {
+  const take_rate = toFixed(0.2, 7);
+  const reserve = mainnetV3Reserve();
+  reserve.protocolFeeRate = V3_PROTOCOL_INTEREST_FEE_RATE;
+  reserve.accrue(take_rate, 1795230829);
+
+  expect(reserve.data.dRate).toEqual(BigInt(1_003_093_396_109));
+  expect(reserve.data.bRate).toEqual(BigInt(1_001_772_094_028));
+  expect(reserve.data.interestRateModifier).toEqual(BigInt(5443623));
+  expect(reserve.data.backstopCredit).toEqual(BigInt(228974023));
+  expect(reserve.data.lastTime).toEqual(1795230829);
+});
+
+test('reserve rates v3 net the protocol interest fee out of the supply rate', () => {
+  const take_rate = toFixed(0.2, 7);
+  const withoutFee = mainnetV3Reserve();
+  withoutFee.setRates(take_rate);
+  const withFee = mainnetV3Reserve();
+  withFee.protocolFeeRate = V3_PROTOCOL_INTEREST_FEE_RATE;
+  withFee.setRates(take_rate);
+
+  expect(withFee.borrowApr).toEqual(withoutFee.borrowApr);
+  expect(withFee.supplyApr / withoutFee.supplyApr).toBeCloseTo(0.998, 5);
+  expect(withFee.estSupplyApy).toBeLessThan(withoutFee.estSupplyApy);
+});
+
+test('reserve accrual v2 has no protocol interest fee', () => {
+  const take_rate = toFixed(0.2, 7);
+  const reserve = mainnetV3Reserve();
+  expect(reserve.protocolFeeRate).toEqual(BigInt(0));
+  reserve.accrue(take_rate, 1795230829);
+
+  // the whole interest is split between suppliers and the backstop
+  expect(reserve.data.dRate).toEqual(BigInt(1_003_093_396_109));
+  expect(reserve.data.bRate).toEqual(BigInt(1_001_772_100_681));
+  expect(reserve.data.backstopCredit).toEqual(BigInt(228976829));
 });
