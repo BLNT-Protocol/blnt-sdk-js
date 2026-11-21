@@ -22,6 +22,13 @@ import {
 } from './reserve_types.js';
 
 /**
+ * The immutable share of positive borrower-interest accrual a V3 pool takes as its protocol fee
+ * before the remainder is split between suppliers and the backstop (0.2%, 7 decimals).
+ * Mirrors `PROTOCOL_INTEREST_FEE_RATE` of the V3 pool contract.
+ */
+export const V3_PROTOCOL_INTEREST_FEE_RATE = BigInt(20_000);
+
+/**
  * Manage ledger data for a reserve in a Blend pool
  */
 export abstract class Reserve {
@@ -30,6 +37,12 @@ export abstract class Reserve {
    * pool. Undefined means the token is not a SAC or the status was unavailable.
    */
   public poolAuthorized: boolean | undefined;
+
+  /**
+   * The share of accrued borrower interest the pool takes as its protocol fee, as a fixed point
+   * number with 7 decimals. Zero for V1 and V2 pools, `V3_PROTOCOL_INTEREST_FEE_RATE` for V3.
+   */
+  public protocolFeeRate: bigint = BigInt(0);
 
   constructor(
     /**
@@ -399,11 +412,13 @@ export abstract class Reserve {
       curIr = extraRate + intersection;
     }
     const borrowApr = FixedMath.toFloat(curIr, 7);
-    const supplyCapture = FixedMath.mulFloor(
+    // the protocol fee comes off the interest first, the backstop takes its share of the rest
+    const supplierShare = FixedMath.mulFloor(
+      FixedMath.SCALAR_7 - this.protocolFeeRate,
       FixedMath.SCALAR_7 - backstopTakeRate,
-      curUtil,
       FixedMath.SCALAR_7
     );
+    const supplyCapture = FixedMath.mulFloor(supplierShare, curUtil, FixedMath.SCALAR_7);
     const supplyApr = FixedMath.toFloat(
       FixedMath.mulFloor(curIr, supplyCapture, FixedMath.SCALAR_7),
       7
@@ -492,14 +507,23 @@ export abstract class Reserve {
 
     const accruedInterest = this.totalLiabilities() - preUpdateLiabilities;
     if (accruedInterest > 0) {
-      const newBackstopCredit = FixedMath.mulFloor(
+      // The pool accrues its protocol fee first, then splits the remainder between suppliers and
+      // the backstop. The contract also carries the fee's sub-unit remainder between accruals;
+      // that carry is not loaded here, so the projected fee can be one unit short.
+      const protocolFee = FixedMath.mulFloor(
         accruedInterest,
+        this.protocolFeeRate,
+        FixedMath.SCALAR_7
+      );
+      const remainingInterest = accruedInterest - protocolFee;
+      const newBackstopCredit = FixedMath.mulFloor(
+        remainingInterest,
         backstopTakeRate,
         FixedMath.SCALAR_7
       );
       this.data.backstopCredit += newBackstopCredit;
       this.data.bRate = FixedMath.divFloor(
-        preUpdateSupply + accruedInterest - newBackstopCredit,
+        preUpdateSupply + remainingInterest - newBackstopCredit,
         this.data.bSupply,
         RATE_SCALAR
       );
@@ -939,6 +963,9 @@ export class ReserveV2 extends Reserve {
         0,
         reserveLedgerEntries.latestLedger
       );
+      if (version === Version.V3) {
+        reserve.protocolFeeRate = V3_PROTOCOL_INTEREST_FEE_RATE;
+      }
       reserve.accrue(backstopTakeRate, timestamp);
       reserves.push(reserve);
     }
