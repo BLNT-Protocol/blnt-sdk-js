@@ -19,11 +19,14 @@ const poolId = StrKey.encodeContract(Buffer.alloc(32, 2));
 const userId = Keypair.random().publicKey();
 
 function invocation(operation: string): xdr.InvokeContractArgs {
-  return xdr.Operation.fromXDR(operation, 'base64')
-    .body()
-    .invokeHostFunctionOp()
-    .hostFunction()
-    .invokeContract();
+  const body = xdr.expectUnionVariant(
+    xdr.Operation.fromXdr(operation, 'base64').body,
+    'invokeHostFunction'
+  );
+  return xdr.expectUnionVariant(
+    body.invokeHostFunctionOp.hostFunction,
+    'hostFunctionTypeInvokeContract'
+  ).invokeContract;
 }
 
 function mapEntry(name: string, value: xdr.ScVal): xdr.ScMapEntry {
@@ -87,12 +90,13 @@ describe('Blend v3 SDK adapters', () => {
       })
     );
 
-    expect(deposit.functionName().toString()).toEqual('deposit');
-    expect(deposit.args()).toHaveLength(4);
-    expect(deposit.args()[0].vec()?.[0].sym().toString()).toEqual('FirstLoss');
-    expect(scValToNative(deposit.args()[1])).toEqual(userId);
-    expect(scValToNative(deposit.args()[2])).toEqual(poolId);
-    expect(scValToNative(deposit.args()[3])).toEqual(25n);
+    expect(deposit.functionName.toString()).toEqual('deposit');
+    expect(deposit.args).toHaveLength(4);
+    const depositTier = xdr.expectUnionVariant(deposit.args[0], 'scvVec').vec[0];
+    expect(xdr.expectUnionVariant(depositTier, 'scvSymbol').sym.toString()).toEqual('FirstLoss');
+    expect(scValToNative(deposit.args[1])).toEqual(userId);
+    expect(scValToNative(deposit.args[2])).toEqual(poolId);
+    expect(scValToNative(deposit.args[3])).toEqual(25n);
 
     const claim = invocation(
       contract.claim({
@@ -102,10 +106,11 @@ describe('Blend v3 SDK adapters', () => {
         min_lp_tokens_out: 10n,
       })
     );
-    expect(claim.functionName().toString()).toEqual('claim');
-    expect(claim.args()[0].vec()?.[0].sym().toString()).toEqual('SecondLoss');
-    expect(claim.args()[2].vec()).toHaveLength(1);
-    expect(scValToNative(claim.args()[3])).toEqual(10n);
+    expect(claim.functionName.toString()).toEqual('claim');
+    const claimTier = xdr.expectUnionVariant(claim.args[0], 'scvVec').vec[0];
+    expect(xdr.expectUnionVariant(claimTier, 'scvSymbol').sym.toString()).toEqual('SecondLoss');
+    expect(xdr.expectUnionVariant(claim.args[2], 'scvVec').vec).toHaveLength(1);
+    expect(scValToNative(claim.args[3])).toEqual(10n);
 
     const withdrawal = invocation(
       contract.withdraw({
@@ -116,9 +121,10 @@ describe('Blend v3 SDK adapters', () => {
         to: userId,
       })
     );
-    expect(withdrawal.functionName().toString()).toEqual('withdraw');
-    expect(withdrawal.args()).toHaveLength(5);
-    expect(withdrawal.args()[0].vec()?.[0].sym().toString()).toEqual('ThirdLoss');
+    expect(withdrawal.functionName.toString()).toEqual('withdraw');
+    expect(withdrawal.args).toHaveLength(5);
+    const withdrawalTier = xdr.expectUnionVariant(withdrawal.args[0], 'scvVec').vec[0];
+    expect(xdr.expectUnionVariant(withdrawalTier, 'scvSymbol').sym.toString()).toEqual('ThirdLoss');
 
     const forcedQueue = invocation(
       contract.forceQueueWithdrawal({
@@ -127,8 +133,8 @@ describe('Blend v3 SDK adapters', () => {
         pool_address: poolId,
       })
     );
-    expect(forcedQueue.functionName().toString()).toEqual('force_queue_withdrawal');
-    expect(forcedQueue.args()).toHaveLength(3);
+    expect(forcedQueue.functionName.toString()).toEqual('force_queue_withdrawal');
+    expect(forcedQueue.args).toHaveLength(3);
 
     const forcedWithdraw = invocation(
       contract.forceWithdrawal({
@@ -137,13 +143,13 @@ describe('Blend v3 SDK adapters', () => {
         pool_address: poolId,
       })
     );
-    expect(forcedWithdraw.functionName().toString()).toEqual('force_withdrawal');
-    expect(forcedWithdraw.args()).toHaveLength(3);
+    expect(forcedWithdraw.functionName.toString()).toEqual('force_withdrawal');
+    expect(forcedWithdraw.args).toHaveLength(3);
 
     const blntPrice = invocation(contract.blntPrice());
-    expect(blntPrice.functionName().toString()).toEqual('blnt_price');
-    expect(blntPrice.args()).toHaveLength(0);
-    expect(BackstopContractV3.parsers.blntPrice(i128(1_250_000n).toXDR('base64'))).toEqual(
+    expect(blntPrice.functionName.toString()).toEqual('blnt_price');
+    expect(blntPrice.args).toHaveLength(0);
+    expect(BackstopContractV3.parsers.blntPrice(i128(1_250_000n).toXdr('base64'))).toEqual(
       1_250_000n
     );
   });

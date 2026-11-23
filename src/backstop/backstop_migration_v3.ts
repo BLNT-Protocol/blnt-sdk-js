@@ -101,27 +101,27 @@ export function decodeMigrationStateV3(storage: xdr.ScMapEntry[]): MigrationStat
   let verifiedQueueUnlock: bigint | undefined;
 
   for (const entry of storage) {
-    switch (decodeEntryKey(entry.key())) {
+    switch (decodeEntryKey(entry.key)) {
       case 'ActivatedAt':
-        activatedAt = asBigInt(entry.val());
+        activatedAt = asBigInt(entry.val);
         break;
       case 'BackfillEnd':
-        backfillEnd = asBigInt(entry.val());
+        backfillEnd = asBigInt(entry.val);
         break;
       case 'BlndBound':
-        blndBindingVerified = Boolean(scValToNative(entry.val()));
+        blndBindingVerified = Boolean(scValToNative(entry.val));
         break;
       case 'BFundAmt':
-        fundedBackfill = asBigInt(entry.val());
+        fundedBackfill = asBigInt(entry.val);
         break;
       case 'MigrationEpochStart':
-        migrationEpochStart = asBigInt(entry.val());
+        migrationEpochStart = asBigInt(entry.val);
         break;
       case 'ScheduledBackfill':
-        scheduledBackfill = asBigInt(entry.val());
+        scheduledBackfill = asBigInt(entry.val);
         break;
       case 'VerifiedQueueUnlock':
-        verifiedQueueUnlock = asBigInt(entry.val());
+        verifiedQueueUnlock = asBigInt(entry.val);
         break;
       default:
         // Other instance keys configure ordinary backstop behavior.
@@ -369,18 +369,22 @@ export class BackstopMigrationV3 {
       new xdr.LedgerKeyContractData({
         contract: Address.fromString(backstopId).toScAddress(),
         key: xdr.ScVal.scvLedgerKeyContractInstance(),
-        durability: xdr.ContractDataDurability.persistent(),
+        durability: xdr.ContractDataDurability.persistent,
       })
     );
     const response = await stellarRpc.getLedgerEntries(instanceKey);
     if (response.entries.length !== 1) {
       throw new Error('Unable to load v3 backstop contract instance');
     }
-    const contractData = response.entries[0].val.contractData();
-    if (decodeEntryKey(contractData.key()) !== 'ContractInstance') {
+    const contractData = xdr.expectUnionVariant(
+      response.entries[0].val,
+      'contractData'
+    ).contractData;
+    if (decodeEntryKey(contractData.key) !== 'ContractInstance') {
       throw new Error('Unexpected ledger entry while loading v3 migration state');
     }
-    const storage = contractData.val().instance().storage() ?? [];
+    const storage =
+      xdr.expectUnionVariant(contractData.val, 'scvContractInstance').instance.storage ?? [];
     return new BackstopMigrationV3(decodeMigrationStateV3(storage), response.latestLedger);
   }
 }

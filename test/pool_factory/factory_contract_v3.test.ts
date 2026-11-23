@@ -8,11 +8,14 @@ const oracleId = StrKey.encodeContract(Buffer.alloc(32, 4));
 const admin = Keypair.random().publicKey();
 
 function invocation(operation: string): xdr.InvokeContractArgs {
-  return xdr.Operation.fromXDR(operation, 'base64')
-    .body()
-    .invokeHostFunctionOp()
-    .hostFunction()
-    .invokeContract();
+  const body = xdr.expectUnionVariant(
+    xdr.Operation.fromXdr(operation, 'base64').body,
+    'invokeHostFunction'
+  );
+  return xdr.expectUnionVariant(
+    body.invokeHostFunctionOp.hostFunction,
+    'hostFunctionTypeInvokeContract'
+  ).invokeContract;
 }
 
 describe('PoolFactoryContractV3', () => {
@@ -40,9 +43,9 @@ describe('PoolFactoryContractV3', () => {
       })
     );
 
-    expect(deploy.functionName().toString()).toEqual('deploy');
-    expect(deploy.args()).toHaveLength(9);
-    expect(scValToNative(deploy.args()[7])).toEqual([
+    expect(deploy.functionName.toString()).toEqual('deploy');
+    expect(deploy.args).toHaveLength(9);
+    expect(scValToNative(deploy.args[7])).toEqual([
       {
         asset: ['BlntXlm'],
         take_rate_weight: 4,
@@ -52,7 +55,7 @@ describe('PoolFactoryContractV3', () => {
         take_rate_weight: 2,
       },
     ]);
-    expect(scValToNative(deploy.args()[8])).toBeNull();
+    expect(scValToNative(deploy.args[8])).toBeNull();
   });
 
   test('encodes factory reads with their v3 entrypoint names', () => {
@@ -60,10 +63,10 @@ describe('PoolFactoryContractV3', () => {
     const isPool = invocation(factory.isPool(poolId));
     const config = invocation(factory.backstopConfig(poolId));
 
-    expect(isPool.functionName().toString()).toEqual('is_pool');
-    expect(scValToNative(isPool.args()[0])).toEqual(poolId);
-    expect(config.functionName().toString()).toEqual('backstop_config');
-    expect(scValToNative(config.args()[0])).toEqual(poolId);
+    expect(isPool.functionName.toString()).toEqual('is_pool');
+    expect(scValToNative(isPool.args[0])).toEqual(poolId);
+    expect(config.functionName.toString()).toEqual('backstop_config');
+    expect(scValToNative(config.args[0])).toEqual(poolId);
   });
 
   test('parses tiers and the controller from one factory response', () => {
@@ -80,7 +83,7 @@ describe('PoolFactoryContractV3', () => {
       'PoolBackstopConfig'
     );
 
-    expect(PoolFactoryContractV3.parsers.backstopConfig(result.toXDR('base64'))).toEqual({
+    expect(PoolFactoryContractV3.parsers.backstopConfig(result.toXdr('base64'))).toEqual({
       access_controller: undefined,
       tiers: [{ asset: BackstopAssetV3.BlntXlm, take_rate_weight: 4 }],
     });

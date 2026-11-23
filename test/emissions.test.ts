@@ -46,7 +46,7 @@ test('v3 reserve emissions accept internal carry fields without weakening v2 par
         'CC6W2UPMNMBTFTIUECXVYUBUF7HZ5C3R3U6XCOHGF5JO4M5OJAS4YKPU'
       ).toScAddress(),
       key: xdr.ScVal.scvSymbol('EmisData'),
-      durability: xdr.ContractDataDurability.persistent(),
+      durability: xdr.ContractDataDurability.persistent,
       val: xdr.ScVal.scvMap([
         mapEntry('carry_initialized', xdr.ScVal.scvBool(true)),
         mapEntry('eps', nativeToScVal(5n, { type: 'u64' })),
@@ -79,7 +79,7 @@ test('v3 user emissions accept internal carry without weakening v2 parsing', () 
         'CC6W2UPMNMBTFTIUECXVYUBUF7HZ5C3R3U6XCOHGF5JO4M5OJAS4YKPU'
       ).toScAddress(),
       key: xdr.ScVal.scvSymbol('UserEmis'),
-      durability: xdr.ContractDataDurability.persistent(),
+      durability: xdr.ContractDataDurability.persistent,
       val: xdr.ScVal.scvMap([
         mapEntry('accrued', nativeToScVal(7n, { type: 'i128' })),
         mapEntry('carry', nativeToScVal(1n, { type: 'i128' })),

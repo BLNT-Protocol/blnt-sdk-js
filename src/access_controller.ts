@@ -16,11 +16,11 @@ function addressToScVal(address: Address | string): xdr.ScVal {
 export class AccessControllerContract extends Contract {
   static readonly parsers = {
     permissions: (result: string): number =>
-      scValToNative(xdr.ScVal.fromXDR(result, 'base64')) as number,
+      scValToNative(xdr.ScVal.fromXdr(result, 'base64')) as number,
   };
 
   permissions(pool: Address | string, user: Address | string): string {
-    return this.call('permissions', addressToScVal(pool), addressToScVal(user)).toXDR('base64');
+    return this.call('permissions', addressToScVal(pool), addressToScVal(user)).toXdr('base64');
   }
 }
 
