@@ -13,19 +13,20 @@ const poolId = StrKey.encodeContract(Buffer.alloc(32, 2));
 const userId = Keypair.random().publicKey();
 
 test('encodes the thin access-controller interface and stable permission bits', () => {
-  const operation = xdr.Operation.fromXDR(
+  const operation = xdr.Operation.fromXdr(
     new AccessControllerContract(controllerId).permissions(poolId, userId),
     'base64'
   );
-  const invocation = operation
-    .body()
-    .invokeHostFunctionOp()
-    .hostFunction()
-    .invokeContract();
+  const hostFunction = xdr.expectUnionVariant(operation.body, 'invokeHostFunction')
+    .invokeHostFunctionOp.hostFunction;
+  const invocation = xdr.expectUnionVariant(
+    hostFunction,
+    'hostFunctionTypeInvokeContract'
+  ).invokeContract;
 
-  expect(invocation.functionName().toString()).toEqual('permissions');
-  expect(scValToNative(invocation.args()[0])).toEqual(poolId);
-  expect(scValToNative(invocation.args()[1])).toEqual(userId);
+  expect(invocation.functionName.toString()).toEqual('permissions');
+  expect(scValToNative(invocation.args[0])).toEqual(poolId);
+  expect(scValToNative(invocation.args[1])).toEqual(userId);
   expect(RESERVE_SUPPLY_ALLOWED).toEqual(1);
   expect(RESERVE_BORROW_ALLOWED).toEqual(2);
   expect(BACKSTOP_DEPOSIT_ALLOWED).toEqual(4);

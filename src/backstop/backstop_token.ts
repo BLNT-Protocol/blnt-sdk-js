@@ -4,7 +4,7 @@ import { decodeEntryKey } from '../ledger_entry_helper.js';
 import { simulateAndParse } from '../simulation_helper.js';
 
 function parseI128(result: string): bigint {
-  return scValToNative(xdr.ScVal.fromXDR(result, 'base64')) as bigint;
+  return scValToNative(xdr.ScVal.fromXdr(result, 'base64')) as bigint;
 }
 
 async function loadCometPublicData(
@@ -17,19 +17,15 @@ async function loadCometPublicData(
   const [blnd, usdc, totalShares] = await Promise.all([
     simulateAndParse(
       network,
-      comet.call('get_balance', Address.fromString(blndTkn).toScVal()).toXDR('base64'),
+      comet.call('get_balance', Address.fromString(blndTkn).toScVal()).toXdr('base64'),
       parseI128
     ),
     simulateAndParse(
       network,
-      comet.call('get_balance', Address.fromString(usdcTkn).toScVal()).toXDR('base64'),
+      comet.call('get_balance', Address.fromString(usdcTkn).toScVal()).toXdr('base64'),
       parseI128
     ),
-    simulateAndParse(
-      network,
-      comet.call('get_total_supply').toXDR('base64'),
-      parseI128
-    ),
+    simulateAndParse(network, comet.call('get_total_supply').toXdr('base64'), parseI128),
   ]);
   return [blnd.result, usdc.result, totalShares.result];
 }
@@ -86,14 +82,14 @@ export class BackstopToken {
       new xdr.LedgerKeyContractData({
         contract: Address.fromString(id).toScAddress(),
         key: xdr.ScVal.scvVec([xdr.ScVal.scvSymbol('AllRecordData')]),
-        durability: xdr.ContractDataDurability.persistent(),
+        durability: xdr.ContractDataDurability.persistent,
       })
     );
     const totalSharesKey = xdr.LedgerKey.contractData(
       new xdr.LedgerKeyContractData({
         contract: Address.fromString(id).toScAddress(),
         key: xdr.ScVal.scvVec([xdr.ScVal.scvSymbol('TotalShares')]),
-        durability: xdr.ContractDataDurability.persistent(),
+        durability: xdr.ContractDataDurability.persistent,
       })
     );
     const ledgerEntriesResp = await stellarRpc.getLedgerEntries(recordDataKey, totalSharesKey);
@@ -102,10 +98,14 @@ export class BackstopToken {
     let totalShares: bigint | undefined;
     for (const entry of ledgerEntriesResp.entries) {
       const ledgerData = entry.val;
-      const key = decodeEntryKey(ledgerData.contractData().key());
+      const key = decodeEntryKey(
+        xdr.expectUnionVariant(ledgerData, 'contractData').contractData.key
+      );
       switch (key) {
         case 'AllRecordData': {
-          const records = scValToNative(ledgerData.contractData().val());
+          const records = scValToNative(
+            xdr.expectUnionVariant(ledgerData, 'contractData').contractData.val
+          );
           if (records != undefined) {
             blnd = records[blndTkn]?.balance;
             usdc = records[usdcTkn]?.balance;
@@ -113,7 +113,9 @@ export class BackstopToken {
           break;
         }
         case 'TotalShares':
-          totalShares = scValToNative(ledgerData.contractData().val());
+          totalShares = scValToNative(
+            xdr.expectUnionVariant(ledgerData, 'contractData').contractData.val
+          );
           break;
         default:
           throw new Error(`Invalid backstop pool key: should not contain ${key}`);
@@ -124,12 +126,7 @@ export class BackstopToken {
       // Comet v2 intentionally does not retain Comet v1's AllRecordData and
       // TotalShares storage layout. Its stable public getters expose the same
       // values without coupling the SDK to private contract storage.
-      [blnd, usdc, totalShares] = await loadCometPublicData(
-        network,
-        id,
-        blndTkn,
-        usdcTkn
-      );
+      [blnd, usdc, totalShares] = await loadCometPublicData(network, id, blndTkn, usdcTkn);
     }
 
     const blndPerLpToken = Number(blnd) / Number(totalShares);

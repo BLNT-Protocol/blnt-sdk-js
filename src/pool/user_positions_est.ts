@@ -92,9 +92,7 @@ export class PositionsEstimate {
       const asset_collateral = reserve.toAssetFromBTokenFloat(value);
       const asset_e_collateral = reserve.toEffectiveAssetFromBTokenFloat(value);
       const base_collateral = asset_collateral * oraclePrice;
-      const base_e_collateral = reserve.isPoolDeauthorized
-        ? 0
-        : asset_e_collateral * oraclePrice;
+      const base_e_collateral = reserve.isPoolDeauthorized ? 0 : asset_e_collateral * oraclePrice;
       totalSupplied += base_collateral;
       totalEffectiveCollateral += base_e_collateral;
       supplyApy += base_collateral * reserve.estSupplyApy;

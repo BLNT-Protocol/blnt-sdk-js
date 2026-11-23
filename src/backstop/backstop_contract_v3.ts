@@ -108,16 +108,15 @@ function optionAddressToScVal(address: Address | string | undefined): xdr.ScVal 
 }
 
 function parseNative<T>(result: string): T {
-  return scValToNative(xdr.ScVal.fromXDR(result, 'base64')) as T;
+  return scValToNative(xdr.ScVal.fromXdr(result, 'base64')) as T;
 }
 
 export function parseBackstopAssetV3(value: unknown): BackstopAssetV3 {
-  const tag =
-    Array.isArray(value)
-      ? value[0]
-      : typeof value === 'object' && value !== null && 'tag' in value
-      ? (value as { tag: unknown }).tag
-      : value;
+  const tag = Array.isArray(value)
+    ? value[0]
+    : typeof value === 'object' && value !== null && 'tag' in value
+    ? (value as { tag: unknown }).tag
+    : value;
   if (Object.values(BackstopAssetV3).includes(tag as BackstopAssetV3)) {
     return tag as BackstopAssetV3;
   }
@@ -125,7 +124,11 @@ export function parseBackstopAssetV3(value: unknown): BackstopAssetV3 {
 }
 
 function parsePoolData(result: string): PoolBackstopDataV3 {
-  const data = parseNative<Omit<PoolBackstopDataV3, 'tiers'> & { tiers: Array<Omit<PoolTierDataV3, 'asset'> & { asset: unknown }> }>(result);
+  const data = parseNative<
+    Omit<PoolBackstopDataV3, 'tiers'> & {
+      tiers: Array<Omit<PoolTierDataV3, 'asset'> & { asset: unknown }>;
+    }
+  >(result);
   return {
     ...data,
     tiers: data.tiers.map((tier) => ({ ...tier, asset: parseBackstopAssetV3(tier.asset) })),
@@ -191,7 +194,7 @@ export class BackstopContractV3 extends Contract {
           : (wasmHash as Buffer),
       salt,
       constructorArgs,
-    }).toXDR('base64');
+    }).toXdr('base64');
   }
 
   constructor(address: string) {
@@ -205,7 +208,7 @@ export class BackstopContractV3 extends Contract {
       addressToScVal(args.from),
       addressToScVal(args.pool_address),
       i128ToScVal(args.amount)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   queueWithdrawal(args: TierBackstopActionArgsV3): string {
@@ -215,7 +218,7 @@ export class BackstopContractV3 extends Contract {
       addressToScVal(args.from),
       addressToScVal(args.pool_address),
       i128ToScVal(args.amount)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   dequeueWithdrawal(args: TierBackstopActionArgsV3): string {
@@ -225,7 +228,7 @@ export class BackstopContractV3 extends Contract {
       addressToScVal(args.from),
       addressToScVal(args.pool_address),
       i128ToScVal(args.amount)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   withdraw(args: TierBackstopWithdrawArgsV3): string {
@@ -236,7 +239,7 @@ export class BackstopContractV3 extends Contract {
       addressToScVal(args.pool_address),
       i128ToScVal(args.amount),
       addressToScVal(args.to)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   forceQueueWithdrawal(args: ForcedBackstopExitArgsV3): string {
@@ -245,7 +248,7 @@ export class BackstopContractV3 extends Contract {
       tierToScVal(args.tier),
       addressToScVal(args.user),
       addressToScVal(args.pool_address)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   forceWithdrawal(args: ForcedBackstopExitArgsV3): string {
@@ -254,7 +257,7 @@ export class BackstopContractV3 extends Contract {
       tierToScVal(args.tier),
       addressToScVal(args.user),
       addressToScVal(args.pool_address)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   userBalance(tier: BackstopTierV3, pool: Address | string, user: Address | string): string {
@@ -263,27 +266,27 @@ export class BackstopContractV3 extends Contract {
       tierToScVal(tier),
       addressToScVal(pool),
       addressToScVal(user)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   poolData(pool: Address | string): string {
-    return this.call('pool_data', addressToScVal(pool)).toXDR('base64');
+    return this.call('pool_data', addressToScVal(pool)).toXdr('base64');
   }
 
   blntPrice(): string {
-    return this.call('blnt_price').toXDR('base64');
+    return this.call('blnt_price').toXdr('base64');
   }
 
   backstopToken(tier: BackstopTierV3, pool: Address | string): string {
-    return this.call('backstop_token', tierToScVal(tier), addressToScVal(pool)).toXDR('base64');
+    return this.call('backstop_token', tierToScVal(tier), addressToScVal(pool)).toXdr('base64');
   }
 
   drop(): string {
-    return this.call('drop').toXDR('base64');
+    return this.call('drop').toXdr('base64');
   }
 
   distribute(): string {
-    return this.call('distribute').toXDR('base64');
+    return this.call('distribute').toXdr('base64');
   }
 
   claim(args: BackstopClaimArgsV3): string {
@@ -293,25 +296,25 @@ export class BackstopContractV3 extends Contract {
       addressToScVal(args.from),
       addressesToScVal(args.pool_addresses),
       i128ToScVal(args.min_lp_tokens_out)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   gulpEmissions(pool: Address | string): string {
-    return this.call('gulp_emissions', addressToScVal(pool)).toXDR('base64');
+    return this.call('gulp_emissions', addressToScVal(pool)).toXdr('base64');
   }
 
   rewardZone(): string {
-    return this.call('reward_zone').toXDR('base64');
+    return this.call('reward_zone').toXdr('base64');
   }
 
   addReward(to_add: Address | string, to_remove?: Address | string): string {
-    return this.call('add_reward', addressToScVal(to_add), optionAddressToScVal(to_remove)).toXDR(
+    return this.call('add_reward', addressToScVal(to_add), optionAddressToScVal(to_remove)).toXdr(
       'base64'
     );
   }
 
   removeReward(to_remove: Address | string): string {
-    return this.call('remove_reward', addressToScVal(to_remove)).toXDR('base64');
+    return this.call('remove_reward', addressToScVal(to_remove)).toXdr('base64');
   }
 
   draw(
@@ -326,7 +329,7 @@ export class BackstopContractV3 extends Contract {
       addressToScVal(pool_address),
       i128ToScVal(amount),
       addressToScVal(to)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   donate(args: TierBackstopActionArgsV3): string {
@@ -336,6 +339,6 @@ export class BackstopContractV3 extends Contract {
       addressToScVal(args.from),
       addressToScVal(args.pool_address),
       i128ToScVal(args.amount)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 }

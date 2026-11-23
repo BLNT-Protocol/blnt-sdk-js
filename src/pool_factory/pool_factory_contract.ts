@@ -8,7 +8,7 @@ import { BackstopAssetV3, parseBackstopAssetV3 } from '../backstop/backstop_cont
 export interface DeployV1Args {
   admin: Address | string;
   name: string;
-  salt: Buffer;
+  salt: Uint8Array;
   oracle: Address | string;
   backstop_take_rate: number;
   max_positions: number;
@@ -17,7 +17,7 @@ export interface DeployV1Args {
 export interface DeployV2Args {
   admin: Address | string;
   name: string;
-  salt: Buffer;
+  salt: Uint8Array;
   oracle: Address | string;
   min_collateral: i128;
   backstop_take_rate: number;
@@ -68,7 +68,7 @@ export abstract class PoolFactoryContract extends Contract {
     return this.call(
       'is_pool',
       ...PoolFactoryContract.spec.funcArgsToScVals('is_pool', { pool_address })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 }
 
@@ -108,7 +108,7 @@ export class PoolFactoryContractV1 extends PoolFactoryContract {
     return this.call(
       'initialize',
       ...PoolFactoryContractV1.spec.funcArgsToScVals('initialize', { pool_init_meta })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
   /**
    * Deploys and initializes a lending pool.
@@ -127,7 +127,7 @@ export class PoolFactoryContractV1 extends PoolFactoryContract {
     return this.call(
       'deploy',
       ...PoolFactoryContractV1.spec.funcArgsToScVals('deploy', contractArgs)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 }
 
@@ -148,7 +148,7 @@ export class PoolFactoryContractV2 extends PoolFactoryContract {
 
   static readonly parsers = {
     ...PoolFactoryContract.parsers,
-    constructor: (result: string): string => scValToNative(xdr.ScVal.fromXDR(result, 'base64')),
+    constructor: (result: string): string => scValToNative(xdr.ScVal.fromXdr(result, 'base64')),
     deployPool: (result: string): string =>
       PoolFactoryContractV2.spec.funcResToNative('deploy', result),
   };
@@ -169,20 +169,20 @@ export class PoolFactoryContractV2 extends PoolFactoryContract {
    */
   static deploy(
     deployer: string,
-    wasmHash: Buffer | string,
+    wasmHash: Uint8Array | string,
     pool_init_meta: PoolInitMeta,
-    salt?: Buffer,
+    salt?: Uint8Array,
     format?: 'hex' | 'base64'
   ): string {
     return Operation.createCustomContract({
       address: Address.fromString(deployer),
       wasmHash:
         typeof wasmHash === 'string'
-          ? Buffer.from(wasmHash, format ?? 'hex')
-          : (wasmHash as Buffer),
+          ? xdr.Hash.fromXdr(wasmHash, format ?? 'hex').toBytes()
+          : wasmHash,
       salt,
       constructorArgs: this.spec.funcArgsToScVals('__constructor', { pool_init_meta }),
-    }).toXDR('base64');
+    }).toXdr('base64');
   }
 
   /**
@@ -203,7 +203,7 @@ export class PoolFactoryContractV2 extends PoolFactoryContract {
     return this.call(
       'deploy',
       ...PoolFactoryContractV2.spec.funcArgsToScVals('deploy', contractArgs)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 }
 
@@ -233,10 +233,7 @@ export class PoolFactoryContractV3 extends PoolFactoryContractV2 {
   static readonly parsers = {
     ...PoolFactoryContract.parsers,
     backstopConfig: (result: string): PoolBackstopConfigV3 => {
-      const config = PoolFactoryContractV3.spec.funcResToNative(
-        'backstop_config',
-        result
-      ) as {
+      const config = PoolFactoryContractV3.spec.funcResToNative('backstop_config', result) as {
         access_controller?: string | null;
         tiers: Array<{ asset: unknown; take_rate_weight: number }>;
       };
@@ -248,7 +245,7 @@ export class PoolFactoryContractV3 extends PoolFactoryContractV2 {
         })),
       };
     },
-    constructor: (result: string): string => scValToNative(xdr.ScVal.fromXDR(result, 'base64')),
+    constructor: (result: string): string => scValToNative(xdr.ScVal.fromXdr(result, 'base64')),
     deployPool: (result: string): string =>
       PoolFactoryContractV3.spec.funcResToNative('deploy', result),
   };
@@ -258,7 +255,7 @@ export class PoolFactoryContractV3 extends PoolFactoryContractV2 {
     return this.call(
       'backstop_config',
       ...PoolFactoryContractV3.spec.funcArgsToScVals('backstop_config', { pool_address })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /** Deploy a pool with one to three ordered backstop tiers. */
@@ -274,6 +271,6 @@ export class PoolFactoryContractV3 extends PoolFactoryContractV2 {
     return this.call(
       'deploy',
       ...PoolFactoryContractV3.spec.funcArgsToScVals('deploy', encodedArgs)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 }

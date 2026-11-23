@@ -6,7 +6,7 @@ import path from 'node:path';
 
 const buildDir = './dist';
 
-const { error, stderr } = spawnSync(
+const { error, status } = spawnSync(
   'tsc',
   [
     '-b',
@@ -18,9 +18,11 @@ const { error, stderr } = spawnSync(
 );
 
 if (error) {
-  console.error(stderr);
   console.error(error);
   throw error;
+}
+if (status !== 0) {
+  process.exit(status ?? 1);
 }
 
 function createEsmModulePackageJson() {

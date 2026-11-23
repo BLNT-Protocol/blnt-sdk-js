@@ -48,7 +48,9 @@ export class TokenMetadata {
     let tokenMetadata: TokenMetadata | undefined = undefined;
     for (const entry of tokenMetadataEntry.entries) {
       const ledgerEntry = entry.val;
-      const key = decodeEntryKey(ledgerEntry.contractData().key());
+      const key = decodeEntryKey(
+        xdr.expectUnionVariant(ledgerEntry, 'contractData').contractData.key
+      );
       switch (key) {
         case 'ContractInstance':
           tokenMetadata = this.fromLedgerEntryData(ledgerEntry);
@@ -75,7 +77,7 @@ export class TokenMetadata {
       new xdr.LedgerKeyContractData({
         contract: Address.fromString(assetId).toScAddress(),
         key: xdr.ScVal.scvLedgerKeyContractInstance(),
-        durability: xdr.ContractDataDurability.persistent(),
+        durability: xdr.ContractDataDurability.persistent,
       })
     );
   }
@@ -86,36 +88,36 @@ export class TokenMetadata {
    */
   static fromLedgerEntryData(ledger_entry_data: xdr.LedgerEntryData | string): TokenMetadata {
     if (typeof ledger_entry_data == 'string') {
-      ledger_entry_data = xdr.LedgerEntryData.fromXDR(ledger_entry_data, 'base64');
+      ledger_entry_data = xdr.LedgerEntryData.fromXdr(ledger_entry_data, 'base64');
     }
-    const instance_val = ledger_entry_data.contractData().val().instance();
+    const instance_val = xdr.expectUnionVariant(
+      xdr.expectUnionVariant(ledger_entry_data, 'contractData').contractData.val,
+      'scvContractInstance'
+    ).instance;
     let name: string | undefined;
     let symbol: string | undefined;
     let decimal: number | undefined;
-    instance_val.storage()?.map((entry) => {
-      const key = decodeEntryKey(entry.key());
+    instance_val.storage?.map((entry) => {
+      const key = decodeEntryKey(entry.key);
       if (key == 'METADATA') {
-        entry
-          .val()
-          .map()
-          ?.forEach((meta_entry) => {
-            const metadataKey = decodeEntryKey(meta_entry.key());
-            switch (metadataKey) {
-              case 'name':
-                name = scValToNative(meta_entry.val());
-                return;
-              case 'symbol':
-                symbol = scValToNative(meta_entry.val());
-                if (symbol == 'native') {
-                  symbol = 'XLM';
-                }
-                return;
-              case 'decimal':
-              case 'decimals':
-                decimal = scValToNative(meta_entry.val());
-                return;
-            }
-          });
+        xdr.expectUnionVariant(entry.val, 'scvMap').map?.forEach((meta_entry) => {
+          const metadataKey = decodeEntryKey(meta_entry.key);
+          switch (metadataKey) {
+            case 'name':
+              name = scValToNative(meta_entry.val);
+              return;
+            case 'symbol':
+              symbol = scValToNative(meta_entry.val);
+              if (symbol == 'native') {
+                symbol = 'XLM';
+              }
+              return;
+            case 'decimal':
+            case 'decimals':
+              decimal = scValToNative(meta_entry.val);
+              return;
+          }
+        });
       }
     });
 
@@ -124,11 +126,7 @@ export class TokenMetadata {
     }
 
     let asset: Asset | undefined;
-    if (
-      instance_val.executable().toXDR().toString() ==
-        xdr.ContractExecutable.contractExecutableStellarAsset().toXDR().toString() &&
-      name
-    ) {
+    if (instance_val.executable.type == 'contractExecutableStellarAsset' && name) {
       if (name == 'native') {
         asset = Asset.native();
       } else {
@@ -207,16 +205,16 @@ function tokenBalanceLedgerKey(tokenId: string, address: Address): xdr.LedgerKey
     new xdr.LedgerKeyContractData({
       contract: Address.fromString(tokenId).toScAddress(),
       key: xdr.ScVal.scvVec([xdr.ScVal.scvSymbol('Balance'), address.toScVal()]),
-      durability: xdr.ContractDataDurability.persistent(),
+      durability: xdr.ContractDataDurability.persistent,
     })
   );
 }
 
 function balanceAuthorized(value: xdr.ScVal): boolean | undefined {
-  const authorized = value
-    .map()
-    ?.find((entry) => decodeEntryKey(entry.key()) === 'authorized');
-  return authorized === undefined ? undefined : Boolean(scValToNative(authorized.val()));
+  const authorized = xdr
+    .expectUnionVariant(value, 'scvMap')
+    .map?.find((entry) => decodeEntryKey(entry.key) === 'authorized');
+  return authorized === undefined ? undefined : Boolean(scValToNative(authorized.val));
 }
 
 /**
@@ -243,18 +241,16 @@ export async function getTokenAuthorizations(
   const stellarAssets = new Set<string>();
 
   for (const entry of response.entries) {
-    const contractData = entry.val.contractData();
-    const tokenId = Address.fromScAddress(contractData.contract()).toString();
-    const key = decodeEntryKey(contractData.key());
+    const contractData = xdr.expectUnionVariant(entry.val, 'contractData').contractData;
+    const tokenId = Address.fromScAddress(contractData.contract).toString();
+    const key = decodeEntryKey(contractData.key);
     if (key === 'ContractInstance') {
-      if (
-        contractData.val().instance().executable().switch() ===
-        xdr.ContractExecutableType.contractExecutableStellarAsset()
-      ) {
+      const instance = xdr.expectUnionVariant(contractData.val, 'scvContractInstance').instance;
+      if (instance.executable.type === 'contractExecutableStellarAsset') {
         stellarAssets.add(tokenId);
       }
     } else if (key === 'Balance') {
-      authorizations.set(tokenId, balanceAuthorized(contractData.val()));
+      authorizations.set(tokenId, balanceAuthorized(contractData.val));
     }
   }
 

@@ -99,7 +99,7 @@ function ledgerKey(backstopId: string, key: xdr.ScVal): xdr.LedgerKey {
     new xdr.LedgerKeyContractData({
       contract: Address.fromString(backstopId).toScAddress(),
       key,
-      durability: xdr.ContractDataDurability.persistent(),
+      durability: xdr.ContractDataDurability.persistent,
     })
   );
 }
@@ -125,11 +125,11 @@ function poolLedgerKeys(
 }
 
 function mapValues(value: xdr.ScVal): Map<string, xdr.ScVal> {
-  const entries = value.map();
+  const entries = xdr.expectUnionVariant(value, 'scvMap').map;
   if (entries === undefined) {
     throw new Error('Expected contract data map');
   }
-  return new Map(entries.map((entry) => [decodeEntryKey(entry.key()), entry.val()]));
+  return new Map(entries.map((entry) => [decodeEntryKey(entry.key), entry.val]));
 }
 
 function requiredBigInt(values: Map<string, xdr.ScVal>, key: string): bigint {
@@ -275,7 +275,10 @@ export class BackstopEmissionsV3 {
       },
     ]);
     const requestedByKey = new Map(
-      requests.map((request) => [request.key.contractData().key().toXDR('base64'), request])
+      requests.map((request) => [
+        xdr.expectUnionVariant(request.key, 'contractData').contractData.key.toXdr('base64'),
+        request,
+      ])
     );
     const stellarRpc = new rpc.Server(network.rpc, network.opts);
     const response = await stellarRpc.getLedgerEntries(...requests.map(({ key }) => key));
@@ -286,15 +289,15 @@ export class BackstopEmissionsV3 {
       poolBalanceByTier[tier] = { shares: 0n, q4w: 0n };
     }
     for (const entry of response.entries) {
-      const contractData = entry.val.contractData();
-      const request = requestedByKey.get(contractData.key().toXDR('base64'));
+      const contractData = xdr.expectUnionVariant(entry.val, 'contractData').contractData;
+      const request = requestedByKey.get(contractData.key.toXdr('base64'));
       if (request === undefined) {
         throw new Error('Unexpected ledger entry while loading v3 backstop emissions');
       }
       if (request.kind === 'emission') {
-        byTier[request.tier] = parseEmission(contractData.val());
+        byTier[request.tier] = parseEmission(contractData.val);
       } else {
-        poolBalanceByTier[request.tier] = parsePoolBalance(contractData.val());
+        poolBalanceByTier[request.tier] = parsePoolBalance(contractData.val);
       }
     }
     return {
@@ -324,7 +327,10 @@ export class BackstopEmissionsV3 {
       }
     }
     const requestedByKey = new Map(
-      requestEntries.map((entry) => [entry.key.contractData().key().toXDR('base64'), entry])
+      requestEntries.map((entry) => [
+        xdr.expectUnionVariant(entry.key, 'contractData').contractData.key.toXdr('base64'),
+        entry,
+      ])
     );
     const states = new Map<string, PoolLedgerState>(
       pools.map((pool) => [
@@ -340,13 +346,13 @@ export class BackstopEmissionsV3 {
     const stellarRpc = new rpc.Server(network.rpc, network.opts);
     const response = await stellarRpc.getLedgerEntries(...requestEntries.map((entry) => entry.key));
     for (const entry of response.entries) {
-      const contractData = entry.val.contractData();
-      const requested = requestedByKey.get(contractData.key().toXDR('base64'));
+      const contractData = xdr.expectUnionVariant(entry.val, 'contractData').contractData;
+      const requested = requestedByKey.get(contractData.key.toXdr('base64'));
       if (requested === undefined) {
         throw new Error('Unexpected ledger entry while estimating v3 BLND claim');
       }
       const state = states.get(requested.pool)!;
-      const values = mapValues(contractData.val());
+      const values = mapValues(contractData.val);
       switch (requested.kind) {
         case 'pool_balance':
           state.pool_shares = requiredBigInt(values, 'shares');
@@ -356,10 +362,10 @@ export class BackstopEmissionsV3 {
           state.user_shares = requiredBigInt(values, 'shares');
           break;
         case 'emission':
-          state.emission = parseEmission(contractData.val());
+          state.emission = parseEmission(contractData.val);
           break;
         case 'user_emission':
-          state.user_emission = parseUserEmission(contractData.val());
+          state.user_emission = parseUserEmission(contractData.val);
           break;
       }
     }

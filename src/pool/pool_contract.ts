@@ -100,8 +100,7 @@ export interface PoolForcedWithdrawArgs {
 
 function omitNamedSpecEntry(entries: xdr.ScSpecEntry[], name: string): xdr.ScSpecEntry[] {
   return entries.filter((entry) => {
-    const value = entry.value() as unknown as { name?: () => { toString(): string } };
-    return typeof value.name !== 'function' || value.name().toString() !== name;
+    return entry.type !== 'scSpecEntryFunctionV0' || entry.functionV0.name.toString() !== name;
   });
 }
 
@@ -194,7 +193,7 @@ export abstract class PoolContract extends Contract {
     return this.call(
       'set_admin',
       ...PoolContract.spec.funcArgsToScVals('set_admin', { new_admin })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -210,7 +209,7 @@ export abstract class PoolContract extends Contract {
     return this.call(
       'cancel_set_reserve',
       ...PoolContract.spec.funcArgsToScVals('cancel_set_reserve', { asset })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -226,7 +225,7 @@ export abstract class PoolContract extends Contract {
     return this.call(
       'set_reserve',
       ...PoolContract.spec.funcArgsToScVals('set_reserve', { asset })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -244,7 +243,7 @@ export abstract class PoolContract extends Contract {
    * @returns A base64-encoded string representing the operation.
    */
   submit(contractArgs: SubmitArgs): string {
-    return this.call('submit', ...PoolContract.spec.funcArgsToScVals('submit', contractArgs)).toXDR(
+    return this.call('submit', ...PoolContract.spec.funcArgsToScVals('submit', contractArgs)).toXdr(
       'base64'
     );
   }
@@ -259,7 +258,7 @@ export abstract class PoolContract extends Contract {
    * @returns A base64-encoded string representing the operation.
    */
   badDebt(user: Address | string): string {
-    return this.call('bad_debt', ...PoolContract.spec.funcArgsToScVals('bad_debt', { user })).toXDR(
+    return this.call('bad_debt', ...PoolContract.spec.funcArgsToScVals('bad_debt', { user })).toXdr(
       'base64'
     );
   }
@@ -276,7 +275,7 @@ export abstract class PoolContract extends Contract {
     return this.call(
       'update_status',
       ...PoolContract.spec.funcArgsToScVals('update_status', {})
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -292,7 +291,7 @@ export abstract class PoolContract extends Contract {
     return this.call(
       'set_status',
       ...PoolContract.spec.funcArgsToScVals('set_status', { pool_status })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -304,7 +303,7 @@ export abstract class PoolContract extends Contract {
     return this.call(
       'gulp_emissions',
       ...PoolContract.spec.funcArgsToScVals('gulp_emissions', {})
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -320,7 +319,7 @@ export abstract class PoolContract extends Contract {
     return this.call(
       'set_emissions_config',
       ...PoolContract.spec.funcArgsToScVals('set_emissions_config', { res_emission_metadata })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -334,7 +333,7 @@ export abstract class PoolContract extends Contract {
    * @returns A base64-encoded string representing the operation.
    */
   claim(contractArgs: PoolClaimArgs): string {
-    return this.call('claim', ...PoolContract.spec.funcArgsToScVals('claim', contractArgs)).toXDR(
+    return this.call('claim', ...PoolContract.spec.funcArgsToScVals('claim', contractArgs)).toXdr(
       'base64'
     );
   }
@@ -352,7 +351,7 @@ export abstract class PoolContract extends Contract {
     return this.call(
       'get_auction',
       ...PoolContract.spec.funcArgsToScVals('get_auction', { auction_id })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -366,7 +365,7 @@ export abstract class PoolContract extends Contract {
     return this.call(
       'get_positions',
       ...PoolContract.spec.funcArgsToScVals('get_positions', { user })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 }
 
@@ -432,7 +431,7 @@ export class PoolContractV1 extends PoolContract {
     return this.call(
       'initialize',
       ...PoolContractV1.spec.funcArgsToScVals('initialize', contractArgs)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -450,7 +449,7 @@ export class PoolContractV1 extends PoolContract {
     return this.call(
       'update_pool',
       ...PoolContract.spec.funcArgsToScVals('update_pool', contractArgs)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -468,7 +467,7 @@ export class PoolContractV1 extends PoolContract {
     return this.call(
       'queue_set_reserve',
       ...PoolContractV1.spec.funcArgsToScVals('queue_set_reserve', contractArgs)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -486,7 +485,7 @@ export class PoolContractV1 extends PoolContract {
     return this.call(
       'new_liquidation_auction',
       ...PoolContractV1.spec.funcArgsToScVals('new_liquidation_auction', contractArgs)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -500,7 +499,7 @@ export class PoolContractV1 extends PoolContract {
     return this.call(
       'new_bad_debt_auction',
       ...PoolContractV1.spec.funcArgsToScVals('new_bad_debt_auction', {})
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -516,7 +515,7 @@ export class PoolContractV1 extends PoolContract {
     return this.call(
       'new_interest_auction',
       ...PoolContractV1.spec.funcArgsToScVals('new_interest_auction', { assets })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 }
 
@@ -575,7 +574,7 @@ export class PoolContractV2 extends PoolContract {
 
   static readonly parsers = {
     ...PoolContract.parsers,
-    deploy: (result: string): string => scValToNative(xdr.ScVal.fromXDR(result, 'base64')),
+    deploy: (result: string): string => scValToNative(xdr.ScVal.fromXdr(result, 'base64')),
     submitWithAllowance: (result: string): Positions => Positions.fromScVal(result),
     flashLoan: (result: string): Positions => Positions.fromScVal(result),
     gulp: (result: string): i128 => PoolContract.spec.funcResToNative('gulp', result),
@@ -615,20 +614,20 @@ export class PoolContractV2 extends PoolContract {
    */
   static deploy(
     deployer: string,
-    wasmHash: Buffer | string,
+    wasmHash: Uint8Array | string,
     args: PoolConstructorArgsV2,
-    salt?: Buffer,
+    salt?: Uint8Array,
     format?: 'hex' | 'base64'
   ): string {
     return Operation.createCustomContract({
       address: Address.fromString(deployer),
       wasmHash:
         typeof wasmHash === 'string'
-          ? Buffer.from(wasmHash, format ?? 'hex')
-          : (wasmHash as Buffer),
+          ? xdr.Hash.fromXdr(wasmHash, format ?? 'hex').toBytes()
+          : wasmHash,
       salt,
       constructorArgs: this.spec.funcArgsToScVals('__constructor', args),
-    }).toXDR('base64');
+    }).toXdr('base64');
   }
 
   /**
@@ -648,7 +647,7 @@ export class PoolContractV2 extends PoolContract {
     return this.call(
       'update_pool',
       ...PoolContract.spec.funcArgsToScVals('update_pool', contractArgs)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -666,7 +665,7 @@ export class PoolContractV2 extends PoolContract {
     return this.call(
       'queue_set_reserve',
       ...PoolContractV2.spec.funcArgsToScVals('queue_set_reserve', contractArgs)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -686,7 +685,7 @@ export class PoolContractV2 extends PoolContract {
     return this.call(
       'submit_with_allowance',
       ...PoolContractV2.spec.funcArgsToScVals('submit_with_allowance', contractArgs)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -704,7 +703,7 @@ export class PoolContractV2 extends PoolContract {
     return this.call(
       'flash_loan',
       ...PoolContractV2.spec.funcArgsToScVals('flash_loan', contractArgs)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -716,7 +715,7 @@ export class PoolContractV2 extends PoolContract {
    * @returns A base64-encoded string representing the operation.
    */
   gulp(asset: string): string {
-    return this.call('gulp', ...PoolContractV2.spec.funcArgsToScVals('gulp', { asset })).toXDR(
+    return this.call('gulp', ...PoolContractV2.spec.funcArgsToScVals('gulp', { asset })).toXdr(
       'base64'
     );
   }
@@ -737,7 +736,7 @@ export class PoolContractV2 extends PoolContract {
     return this.call(
       'new_auction',
       ...PoolContractV2.spec.funcArgsToScVals('new_auction', contractArgs)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -754,7 +753,7 @@ export class PoolContractV2 extends PoolContract {
     return this.call(
       'del_auction',
       ...PoolContractV2.spec.funcArgsToScVals('del_auction', { auction_type, user })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -770,7 +769,7 @@ export class PoolContractV2 extends PoolContract {
     return this.call(
       'propose_admin',
       ...PoolContractV2.spec.funcArgsToScVals('propose_admin', { new_admin })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -784,7 +783,7 @@ export class PoolContractV2 extends PoolContract {
     return this.call(
       'accept_admin',
       ...PoolContractV2.spec.funcArgsToScVals('accept_admin', {})
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -793,7 +792,7 @@ export class PoolContractV2 extends PoolContract {
    * @returns A base64-encoded string representing the operation.
    */
   getConfig(): string {
-    return this.call('get_config', ...PoolContractV2.spec.funcArgsToScVals('get_config', {})).toXDR(
+    return this.call('get_config', ...PoolContractV2.spec.funcArgsToScVals('get_config', {})).toXdr(
       'base64'
     );
   }
@@ -804,7 +803,7 @@ export class PoolContractV2 extends PoolContract {
    * @returns A base64-encoded string representing the operation.
    */
   getAdmin(): string {
-    return this.call('get_admin', ...PoolContractV2.spec.funcArgsToScVals('get_admin', {})).toXDR(
+    return this.call('get_admin', ...PoolContractV2.spec.funcArgsToScVals('get_admin', {})).toXdr(
       'base64'
     );
   }
@@ -820,7 +819,7 @@ export class PoolContractV2 extends PoolContract {
     return this.call(
       'get_reserve',
       ...PoolContractV2.spec.funcArgsToScVals('get_reserve', { asset })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -834,7 +833,7 @@ export class PoolContractV2 extends PoolContract {
     return this.call(
       'get_reserve_emissions',
       ...PoolContractV2.spec.funcArgsToScVals('get_reserve_emissions', { reserve_token_id })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -849,7 +848,7 @@ export class PoolContractV2 extends PoolContract {
     return this.call(
       'get_user_emissions',
       ...PoolContractV2.spec.funcArgsToScVals('get_user_emissions', { user, reserve_token_id })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -861,7 +860,7 @@ export class PoolContractV2 extends PoolContract {
     return this.call(
       'get_reserve_list',
       ...PoolContractV2.spec.funcArgsToScVals('get_reserve_list', {})
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 }
 
@@ -911,7 +910,7 @@ export class PoolContractV3 extends PoolContractV2 {
         ...args,
         access_controller: args.access_controller,
       }),
-    }).toXDR('base64');
+    }).toXdr('base64');
   }
 
   /**
@@ -923,7 +922,7 @@ export class PoolContractV3 extends PoolContractV2 {
     return this.call(
       'clawback',
       ...PoolContractV3.spec.funcArgsToScVals('clawback', contractArgs)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /**
@@ -935,7 +934,7 @@ export class PoolContractV3 extends PoolContractV2 {
     return this.call(
       'reconcile_loss',
       ...PoolContractV3.spec.funcArgsToScVals('reconcile_loss', { asset })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /** Return every supplied share for one asset to a user whose supply permission is absent. */
@@ -943,7 +942,7 @@ export class PoolContractV3 extends PoolContractV2 {
     return this.call(
       'force_withdrawal',
       ...PoolContractV3.spec.funcArgsToScVals('force_withdrawal', contractArgs)
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 
   /** Create the canonical basket auction that exits a revoked borrower. */
@@ -951,6 +950,6 @@ export class PoolContractV3 extends PoolContractV2 {
     return this.call(
       'new_forced_exit_auction',
       ...PoolContractV3.spec.funcArgsToScVals('new_forced_exit_auction', { user })
-    ).toXDR('base64');
+    ).toXdr('base64');
   }
 }

@@ -25,7 +25,7 @@ function reserveStateKey(poolId: string, asset: string): xdr.LedgerKey {
     new xdr.LedgerKeyContractData({
       contract: Address.fromString(poolId).toScAddress(),
       key,
-      durability: xdr.ContractDataDurability.persistent(),
+      durability: xdr.ContractDataDurability.persistent,
     })
   );
 }
@@ -86,7 +86,9 @@ export class PoolInterestReserveV3 {
     const state =
       response.entries.length === 0
         ? decodeInterestReserveStateV3()
-        : decodeInterestReserveStateV3(response.entries[0].val.contractData().val());
+        : decodeInterestReserveStateV3(
+            xdr.expectUnionVariant(response.entries[0].val, 'contractData').contractData.val
+          );
     return new PoolInterestReserveV3(state, response.entries.length === 1, response.latestLedger);
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@blnt-protocol/blnt-sdk",
-  "version": "1.0.1",
+  "version": "2.0.0-rc.1",
   "description": "JavaScript SDK for BLNT V3 and compatible Blend-derived contracts",
   "type": "module",
   "scripts": {
@@ -42,8 +42,10 @@
     "typescript": "^5.1.6"
   },
   "dependencies": {
-    "@stellar/stellar-sdk": "16.4.1",
-    "buffer": "6.0.3",
-    "follow-redirects": ">=1.15.6"
+    "@stellar/stellar-sdk": "17.4.0",
+    "follow-redirects": "1.16.3"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }
