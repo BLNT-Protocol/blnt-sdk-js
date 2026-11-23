@@ -1,6 +1,6 @@
 {
   "name": "@blnt-protocol/blnt-sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "JavaScript SDK for BLNT V3 and compatible Blend-derived contracts",
   "type": "module",
   "scripts": {
